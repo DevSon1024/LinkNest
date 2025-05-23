@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added for clipboard
 import 'package:url_launcher/url_launcher.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
@@ -85,13 +86,27 @@ class LinksPageState extends State<LinksPage> {
         print('Launching URL in default browser: $uri'); // Debug log
         await launchUrl(uri, mode: LaunchMode.platformDefault);
       } else {
-        _showSnackBar('Cannot open URL in browser: $formattedUrl');
-        print('Cannot launch URL in browser: $uri'); // Debug log
+        print('Cannot launch URL in browser, trying fallback: $uri'); // Debug log
+        // Fallback: Try opening with a generic intent
+        final fallbackUri = Uri.parse('https://www.google.com');
+        if (await canLaunchUrl(fallbackUri)) {
+          print('Launching fallback URL: $fallbackUri'); // Debug log
+          await launchUrl(fallbackUri, mode: LaunchMode.platformDefault);
+          _showSnackBar('No browser found for $formattedUrl, opened fallback');
+        } else {
+          _showSnackBar('No browser installed to open: $formattedUrl');
+          print('No browser available for URL: $uri'); // Debug log
+        }
       }
     } catch (e) {
       _showSnackBar('Error opening URL: $e');
       print('Error opening URL: $e'); // Debug log
     }
+  }
+
+  void _copyUrl(String url) {
+    Clipboard.setData(ClipboardData(text: url));
+    _showSnackBar('URL copied to clipboard');
   }
 
   void _showSnackBar(String message) {
@@ -110,8 +125,50 @@ class LinksPageState extends State<LinksPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _openLink(link.url),
+        onLongPress: () {
+          _showLinkOptionsMenu(context, link);
+        },
         child: _isGridView ? _buildGridItem(link) : _buildListItem(link),
       ),
+    );
+  }
+
+  void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.open_in_new),
+                title: Text('Open Link'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openLink(link.url);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.copy),
+                title: Text('Copy URL'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _copyUrl(link.url);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.delete, color: Colors.red),
+                title: Text('Delete', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteLink(link);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -121,71 +178,106 @@ class LinksPageState extends State<LinksPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              child: Container(
-                height: constraints.maxWidth * 0.6,
-                color: Colors.grey[200],
-                child: link.imageUrl.isNotEmpty
-                    ? Image.network(
-                  link.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Center(
-                    child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
-                  ),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                            : null,
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                  child: Container(
+                    height: constraints.maxHeight * 0.75, // Keep thumbnail size
+                    color: Colors.grey[200],
+                    child: link.imageUrl.isNotEmpty
+                        ? Image.network(
+                      link.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Center(
+                        child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
                       ),
-                    );
-                  },
-                )
-                    : Center(
-                  child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        );
+                      },
+                    )
+                        : Center(
+                      child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
+                    ),
+                  ),
                 ),
-              ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: PopupMenuButton<String>(
+                    icon: Icon(Icons.more_vert, size: 20, color: Colors.grey[800]),
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _deleteLink(link);
+                      } else if (value == 'copy') {
+                        _copyUrl(link.url);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 18),
+                            SizedBox(width: 8),
+                            Text('Delete'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'copy',
+                        child: Row(
+                          children: [
+                            Icon(Icons.copy, size: 18),
+                            SizedBox(width: 8),
+                            Text('Copy URL'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Padding(
-              padding: EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    link.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      height: 1.2,
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(6), // Slightly reduced padding
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        link.title,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11, // Smaller font for title
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    link.domain,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
+                    SizedBox(height: 2),
+                    Text(
+                      link.domain,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 9, // Smaller font for domain
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: Icon(Icons.delete_outline, size: 20),
-                      onPressed: () => _deleteLink(link),
-                      padding: EdgeInsets.zero,
-                      constraints: BoxConstraints(),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -270,9 +362,37 @@ class LinksPageState extends State<LinksPage> {
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.delete_outline),
-            onPressed: () => _deleteLink(link),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'delete') {
+                _deleteLink(link);
+              } else if (value == 'copy') {
+                _copyUrl(link.url);
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, size: 18),
+                    SizedBox(width: 8),
+                    Text('Delete'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'copy',
+                child: Row(
+                  children: [
+                    Icon(Icons.copy, size: 18),
+                    SizedBox(width: 8),
+                    Text('Copy URL'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

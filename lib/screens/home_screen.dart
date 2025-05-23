@@ -21,6 +21,8 @@ class HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // In home_screen.dart, ensure the method is accessible from outside:
+
   void showAddLinkDialog(BuildContext context) {
     _urlController.clear();
     showDialog(
