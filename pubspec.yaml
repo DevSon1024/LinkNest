@@ -13,7 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   receive_sharing_intent: ^1.4.5
   metadata_fetch: ^0.4.1
-  url_launcher: ^6.1.12
+  url_launcher: ^6.3.0
   sqflite: ^2.3.0
   path: ^1.8.3
   shared_preferences: ^2.2.0
