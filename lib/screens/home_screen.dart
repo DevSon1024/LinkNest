@@ -13,52 +13,10 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final TextEditingController _urlController = TextEditingController();
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  // In home_screen.dart, ensure the method is accessible from outside:
-
-  void showAddLinkDialog(BuildContext context) {
-    _urlController.clear();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add Link'),
-        content: TextField(
-          controller: _urlController,
-          decoration: InputDecoration(
-            hintText: 'Enter URL',
-            border: OutlineInputBorder(),
-          ),
-          keyboardType: TextInputType.url,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (_urlController.text.isNotEmpty) {
-                addLinkFromUrl(_urlController.text);
-              }
-            },
-            child: Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> addLinkFromUrl(String url) async {
     if (await _dbHelper.linkExists(url)) {
-      _showSnackBar('Link already exists');
+      if (mounted) _showSnackBar('Link already exists');
       return;
     }
 
@@ -67,19 +25,21 @@ class HomeScreenState extends State<HomeScreen> {
       if (linkModel != null) {
         await _dbHelper.insertLink(linkModel);
         widget.onLinkAdded?.call();
-        _showSnackBar('Link saved successfully');
+        if (mounted) _showSnackBar('Link saved successfully');
       } else {
-        _showSnackBar('Failed to extract link information');
+        if (mounted) _showSnackBar('Failed to extract link information');
       }
     } catch (e) {
-      _showSnackBar('Error saving link: $e');
+      if (mounted) _showSnackBar('Error saving link: $e');
     }
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   @override

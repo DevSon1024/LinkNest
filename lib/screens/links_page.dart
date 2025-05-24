@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Added for clipboard
 import 'package:url_launcher/url_launcher.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
+import 'package:share_plus/share_plus.dart';
 
 class LinksPage extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -59,9 +60,21 @@ class LinksPageState extends State<LinksPage> {
     );
 
     if (confirm == true && link.id != null) {
+      final deletedLink = link; // Store link for undo
       await _dbHelper.deleteLink(link.id!);
       await loadLinks();
-      _showSnackBar('Link deleted');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Link deleted'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () async {
+              await _dbHelper.insertLink(deletedLink);
+              await loadLinks();
+            },
+          ),
+        ),
+      );
     }
   }
 
@@ -115,22 +128,15 @@ class LinksPageState extends State<LinksPage> {
     );
   }
 
-  Widget _buildLinkItem(LinkModel link) {
-    return Card(
-      margin: EdgeInsets.all(8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _openLink(link.url),
-        onLongPress: () {
-          _showLinkOptionsMenu(context, link);
-        },
-        child: _isGridView ? _buildGridItem(link) : _buildListItem(link),
-      ),
-    );
+  void _shareLink(String url, String title) async {
+    try {
+      await Share.share(
+        '$title\n$url',
+        subject: title.isNotEmpty ? title : 'Shared Link',
+      );
+    } catch (e) {
+      _showSnackBar('Error sharing link: $e');
+    }
   }
 
   void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
@@ -158,6 +164,14 @@ class LinksPageState extends State<LinksPage> {
                 },
               ),
               ListTile(
+                leading: Icon(Icons.share),
+                title: Text('Share'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareLink(link.url, link.title);
+                },
+              ),
+              ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
                 title: Text('Delete', style: TextStyle(color: Colors.red)),
                 onTap: () {
@@ -172,84 +186,127 @@ class LinksPageState extends State<LinksPage> {
     );
   }
 
+
+  Widget _buildLinkItem(LinkModel link) {
+    return Card(
+      margin: EdgeInsets.all(8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _openLink(link.url),
+        onLongPress: () {
+          _showLinkOptionsMenu(context, link);
+        },
+        child: _isGridView ? _buildGridItem(link) : _buildListItem(link),
+      ),
+    );
+  }
+
+
   Widget _buildGridItem(LinkModel link) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                  child: Container(
-                    height: constraints.maxHeight * 0.75, // Keep thumbnail size
-                    color: Colors.grey[200],
-                    child: link.imageUrl.isNotEmpty
-                        ? Image.network(
-                      link.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Center(
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min, // Allow dynamic sizing
+            children: [
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                    child: Container(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxWidth * 0.75, // Minimum height for consistency
+                        maxHeight: constraints.maxWidth * 0.95, // Allow taller images
+                      ),
+                      color: Colors.grey[200],
+                      child: link.imageUrl.isNotEmpty
+                          ? Image.network(
+                        link.imageUrl,
+                        fit: BoxFit.cover, // Use cover to crop landscape images
+                        width: constraints.maxWidth,
+                        errorBuilder: (context, error, stackTrace) => Center(
+                          child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
+                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                                  : null,
+                            ),
+                          );
+                        },
+                      )
+                          : Center(
                         child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
                       ),
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        );
-                      },
-                    )
-                        : Center(
-                      child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
                     ),
                   ),
-                ),
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, size: 20, color: Colors.grey[800]),
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _deleteLink(link);
-                      } else if (value == 'copy') {
-                        _copyUrl(link.url);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, size: 18),
-                            SizedBox(width: 8),
-                            Text('Delete'),
-                          ],
-                        ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        shape: BoxShape.circle,
                       ),
-                      PopupMenuItem(
-                        value: 'copy',
-                        child: Row(
-                          children: [
-                            Icon(Icons.copy, size: 18),
-                            SizedBox(width: 8),
-                            Text('Copy URL'),
-                          ],
-                        ),
+                      child: PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert, size: 20, color: Colors.grey[800]),
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            _deleteLink(link);
+                          } else if (value == 'copy') {
+                            _copyUrl(link.url);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, size: 18),
+                                SizedBox(width: 8),
+                                Text('Delete'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'copy',
+                            child: Row(
+                              children: [
+                                Icon(Icons.copy, size: 18),
+                                SizedBox(width: 8),
+                                Text('Copy URL'),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.all(6), // Slightly reduced padding
+                ],
+              ),
+              Padding(
+                padding: EdgeInsets.all(8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -259,19 +316,19 @@ class LinksPageState extends State<LinksPage> {
                         link.title,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 11, // Smaller font for title
+                          fontSize: 12,
                           height: 1.2,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    SizedBox(height: 4),
                     Text(
                       link.domain,
                       style: TextStyle(
                         color: Colors.grey[600],
-                        fontSize: 9, // Smaller font for domain
+                        fontSize: 10,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -279,8 +336,8 @@ class LinksPageState extends State<LinksPage> {
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -362,37 +419,9 @@ class LinksPageState extends State<LinksPage> {
               ],
             ),
           ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'delete') {
-                _deleteLink(link);
-              } else if (value == 'copy') {
-                _copyUrl(link.url);
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, size: 18),
-                    SizedBox(width: 8),
-                    Text('Delete'),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'copy',
-                child: Row(
-                  children: [
-                    Icon(Icons.copy, size: 18),
-                    SizedBox(width: 8),
-                    Text('Copy URL'),
-                  ],
-                ),
-              ),
-            ],
+          IconButton(
+            icon: Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: () => _deleteLink(link),
           ),
         ],
       ),

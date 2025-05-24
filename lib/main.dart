@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/links_page.dart';
+import 'screens/input_page.dart';
+import 'screens/menu_page.dart'; // Added import
 import 'services/share_service.dart';
 import 'dart:async';
 
@@ -52,10 +54,15 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _setupSharingIntent() {
-    _sharingIntentSubscription = ShareService.sharedLinkStream.listen((sharedText) {
+    _sharingIntentSubscription = ShareService.sharedLinkStream.listen((sharedText) async {
       final url = ShareService.extractUrlFromText(sharedText);
       if (url != null) {
-        _homeScreenKey.currentState?.addLinkFromUrl(url);
+        await _homeScreenKey.currentState?.addLinkFromUrl(url);
+        setState(() {
+          _selectedIndex = 1;
+          _pageController.jumpToPage(1);
+        });
+        _linksPageKey.currentState?.loadLinks();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No valid URL found in shared content')),
@@ -112,7 +119,7 @@ class _MainScreenState extends State<MainScreen> {
             onRefresh: () => _linksPageKey.currentState?.loadLinks(),
           ),
           Container(), // Placeholder for Folder page
-          Container(), // Placeholder for Settings page
+          const MenuPage(), // Replaced placeholder with MenuPage
         ],
       ),
       bottomNavigationBar: BottomAppBar(
@@ -138,7 +145,14 @@ class _MainScreenState extends State<MainScreen> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: Theme.of(context).primaryColor,
         onPressed: () {
-          _homeScreenKey.currentState?.showAddLinkDialog(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => InputPage(
+                onLinkAdded: () => _linksPageKey.currentState?.loadLinks(),
+              ),
+            ),
+          );
         },
         shape: const CircleBorder(),
         elevation: 4,

@@ -18,11 +18,33 @@ dependencies:
   path: ^1.8.3
   shared_preferences: ^2.2.0
   http: ^1.1.0
+  file_picker: ^8.1.2
+  permission_handler: ^11.3.1
+  archive: ^3.6.1
+  path_provider: ^2.1.4
+  device_info_plus: ^10.1.0
+  share_plus: ^7.2.2
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.5
 
 flutter:
   uses-material-design: true
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"  # <-- your logo path
+
+flutter_native_splash:
+  color: "#ffffff" # background color
+  image: assets/logo.png
+  android: true
+  ios: true
+  android_gravity: center
+  ios_content_mode: center
