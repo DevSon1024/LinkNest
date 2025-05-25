@@ -1,0 +1,53 @@
+name: link_saver
+description: A Flutter app to save and organize shared links
+publish_to: 'none'
+version: 1.0.2+1
+
+environment:
+  sdk: ^3.7.2
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  receive_sharing_intent: ^1.8.1
+  metadata_fetch: ^0.4.2
+  url_launcher: ^6.3.1
+  sqflite: ^2.4.2
+  path: ^1.9.1
+  shared_preferences: ^2.5.3
+  http: ^1.4.0
+  file_picker: ^10.1.9
+  permission_handler: ^12.0.0
+  archive: ^4.0.7
+  package_info_plus: ^8.3.0
+  path_provider: ^2.1.5
+  device_info_plus: ^11.4.0
+  share_plus: ^11.0.0
+  flutter_markdown: ^0.7.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.5
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/update.md
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"  # <-- your logo path
+
+flutter_native_splash:
+  color: "#ffffff" # background color
+  image: assets/logo.png
+  android: true
+  ios: true
+  android_gravity: center
+  ios_content_mode: center
