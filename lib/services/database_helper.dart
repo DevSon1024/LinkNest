@@ -29,24 +29,28 @@ class DatabaseHelper {
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE links(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        url TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        imageUrl TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        domain TEXT NOT NULL,
-        tags TEXT NOT NULL,
-        notes TEXT
-      )
-    ''');
+    CREATE TABLE links(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      imageUrl TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      domain TEXT NOT NULL,
+      tags TEXT NOT NULL,
+      notes TEXT,
+      orderIndex INTEGER
+    )
+  ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE links ADD COLUMN tags TEXT NOT NULL DEFAULT "[]";');
       await db.execute('ALTER TABLE links ADD COLUMN notes TEXT;');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE links ADD COLUMN orderIndex INTEGER;');
     }
   }
 
@@ -59,9 +63,8 @@ class DatabaseHelper {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'links',
-      orderBy: 'createdAt DESC',
+      orderBy: 'orderIndex ASC, createdAt DESC',
     );
-
     return List.generate(maps.length, (i) {
       return LinkModel.fromMap(maps[i]);
     });

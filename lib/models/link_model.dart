@@ -32,7 +32,7 @@ class LinkModel {
       'imageUrl': imageUrl,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'domain': domain,
-      'tags': jsonEncode(tags),
+      'tags': json.encode(tags),
       'notes': notes,
     };
   }
@@ -46,7 +46,7 @@ class LinkModel {
       imageUrl: map['imageUrl'] ?? '',
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       domain: map['domain'] ?? '',
-      tags: map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
+      tags: map['tags'] != null ? List<String>.from(json.decode(map['tags'])) : [],
       notes: map['notes'],
     );
   }

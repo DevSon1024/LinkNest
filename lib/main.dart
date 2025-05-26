@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/links_page.dart';
+import 'screens/links_folders_page.dart';
 import 'screens/input_page.dart';
 import 'screens/menu_page.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -8,10 +9,12 @@ import 'dart:async';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -20,13 +23,15 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: MainScreen(),
+      home: const MainScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }
@@ -37,6 +42,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
   final GlobalKey<LinksPageState> _linksPageKey = GlobalKey<LinksPageState>();
+  final GlobalKey<LinksFoldersPageState> _foldersPageKey = GlobalKey<LinksFoldersPageState>();
 
   // Sharing intent variables
   late StreamSubscription _intentMediaSub;
@@ -67,7 +73,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.resumed) {
       print('App resumed, checking for shared data...');
-      Future.delayed(Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && !_isProcessingSharedLink) {
           _checkForInitialSharedMedia();
         }
@@ -100,7 +106,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
 
     _checkForInitialSharedMedia();
-    _setupPeriodicCleanup();
+    _setupMobile();
   }
 
   void _checkForInitialSharedMedia() {
@@ -115,7 +121,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error getting initial media: $error'),
+            content: Text('Error processing shared media: $error'),
             backgroundColor: Colors.red,
           ),
         );
@@ -154,7 +160,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             _selectedIndex = 0;
             _pageController.jumpToPage(0);
           });
-          await Future.delayed(Duration(milliseconds: 300));
+          await Future.delayed(const Duration(milliseconds: 300));
         }
 
         final success = await _homeScreenKey.currentState?.addLinkFromUrl(url);
@@ -167,15 +173,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             _pageController.jumpToPage(1);
           });
 
-          await Future.delayed(Duration(milliseconds: 300));
+          await Future.delayed(const Duration(milliseconds: 300));
           if (mounted) {
             _linksPageKey.currentState?.loadLinks();
+            _foldersPageKey.currentState?.loadFolders();
           }
 
           if (mounted) {
             ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('Link saved successfully!'),
                 backgroundColor: Colors.green,
                 duration: Duration(seconds: 2),
@@ -195,7 +202,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           }
         }
 
-        Timer(Duration(milliseconds: 2000), () {
+        Timer(const Duration(milliseconds: 2000), () {
           _processedLinks.remove(linkKey);
         });
       }
@@ -211,14 +218,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         );
       }
     } finally {
-      Future.delayed(Duration(milliseconds: 1000), () {
+      Future.delayed(const Duration(milliseconds: 1000), () {
         _isProcessingSharedLink = false;
       });
     }
   }
 
-  void _setupPeriodicCleanup() {
-    _cleanupTimer = Timer.periodic(Duration(minutes: 5), (timer) {
+  void _setupMobile() {
+    _cleanupTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       final oldSize = _processedLinks.length;
       _processedLinks.clear();
       print('Periodic cleanup - cleared $oldSize processed links');
@@ -231,6 +238,37 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _pageController.jumpToPage(index);
       FocusScope.of(context).unfocus();
     });
+  }
+
+  Widget _buildNavItem(int index, IconData filledIcon, IconData outlinedIcon, String label) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => _onNavItemTapped(index),
+        borderRadius: BorderRadius.circular(50),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? filledIcon : outlinedIcon,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
+              size: 28,
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -266,13 +304,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         children: [
           HomeScreen(
             key: _homeScreenKey,
-            onLinkAdded: () => _linksPageKey.currentState?.loadLinks(),
+            onLinkAdded: () {
+              _linksPageKey.currentState?.loadLinks();
+              _foldersPageKey.currentState?.loadFolders();
+            },
           ),
           LinksPage(
             key: _linksPageKey,
             onRefresh: () => _linksPageKey.currentState?.loadLinks(),
           ),
-          Container(), // Placeholder for Folder page
+          LinksFoldersPage(
+            key: _foldersPageKey,
+            onRefresh: () => _foldersPageKey.currentState?.loadFolders(),
+          ),
           const MenuPage(),
         ],
       ),
@@ -290,7 +334,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               _buildNavItem(0, Icons.home, Icons.home_outlined, 'Home'),
               _buildNavItem(1, Icons.link, Icons.link_outlined, 'Links'),
               const SizedBox(width: 40), // Gap for FAB
-              _buildNavItem(2, Icons.folder, Icons.folder_outlined, 'Folder'),
+              _buildNavItem(2, Icons.folder, Icons.folder_outlined, 'Folders'),
               _buildNavItem(3, Icons.menu, Icons.menu_outlined, 'Menu'),
             ],
           ),
@@ -303,7 +347,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             context,
             MaterialPageRoute(
               builder: (context) => InputPage(
-                onLinkAdded: () => _linksPageKey.currentState?.loadLinks(),
+                onLinkAdded: () {
+                  _linksPageKey.currentState?.loadLinks();
+                  _foldersPageKey.currentState?.loadFolders();
+                },
               ),
             ),
           );
@@ -317,37 +364,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData filledIcon, IconData outlinedIcon, String label) {
-    final isSelected = _selectedIndex == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => _onNavItemTapped(index),
-        borderRadius: BorderRadius.circular(50),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? filledIcon : outlinedIcon,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
-              size: 28,
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
