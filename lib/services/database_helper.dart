@@ -8,6 +8,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static Database? _database;
+  static const int _databaseVersion = 2;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -20,8 +21,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: _databaseVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -34,14 +36,23 @@ class DatabaseHelper {
         description TEXT NOT NULL,
         imageUrl TEXT NOT NULL,
         createdAt INTEGER NOT NULL,
-        domain TEXT NOT NULL
+        domain TEXT NOT NULL,
+        tags TEXT NOT NULL,
+        notes TEXT
       )
     ''');
   }
 
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE links ADD COLUMN tags TEXT NOT NULL DEFAULT "[]";');
+      await db.execute('ALTER TABLE links ADD COLUMN notes TEXT;');
+    }
+  }
+
   Future<int> insertLink(LinkModel link) async {
     final db = await database;
-    return await db.insert('links', link.toMap());
+    return await db.insert('links', link.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<LinkModel>> getAllLinks() async {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class LinkModel {
   final int? id;
   final String url;
@@ -6,6 +8,8 @@ class LinkModel {
   final String imageUrl;
   final DateTime createdAt;
   final String domain;
+  final List<String> tags;
+  final String? notes;
 
   LinkModel({
     this.id,
@@ -15,6 +19,8 @@ class LinkModel {
     required this.imageUrl,
     required this.createdAt,
     required this.domain,
+    required this.tags,
+    this.notes,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +32,8 @@ class LinkModel {
       'imageUrl': imageUrl,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'domain': domain,
+      'tags': jsonEncode(tags),
+      'notes': notes,
     };
   }
 
@@ -38,6 +46,8 @@ class LinkModel {
       imageUrl: map['imageUrl'] ?? '',
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       domain: map['domain'] ?? '',
+      tags: map['tags'] != null ? List<String>.from(jsonDecode(map['tags'])) : [],
+      notes: map['notes'],
     );
   }
 
@@ -49,6 +59,8 @@ class LinkModel {
     String? imageUrl,
     DateTime? createdAt,
     String? domain,
+    List<String>? tags,
+    String? notes,
   }) {
     return LinkModel(
       id: id ?? this.id,
@@ -58,6 +70,8 @@ class LinkModel {
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
       domain: domain ?? this.domain,
+      tags: tags ?? this.tags,
+      notes: notes ?? this.notes,
     );
   }
 }

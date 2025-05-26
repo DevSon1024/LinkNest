@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Added for clipboard
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import 'package:share_plus/share_plus.dart';
@@ -30,7 +32,7 @@ class LinksPageState extends State<LinksPage> {
     setState(() => _isLoading = true);
     try {
       final links = await _dbHelper.getAllLinks();
-      print('Loaded links: ${links.map((link) => link.url).toList()}'); // Debug log
+      print('Loaded links: ${links.map((link) => link.url).toList()}');
       setState(() => _links = links);
     } catch (e) {
       _showSnackBar('Error loading links: $e');
@@ -60,7 +62,7 @@ class LinksPageState extends State<LinksPage> {
     );
 
     if (confirm == true && link.id != null) {
-      final deletedLink = link; // Store link for undo
+      final deletedLink = link;
       await _dbHelper.deleteLink(link.id!);
       await loadLinks();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +82,7 @@ class LinksPageState extends State<LinksPage> {
 
   Future<void> _openLink(String url) async {
     try {
-      print('Attempting to open URL: $url'); // Debug log
+      print('Attempting to open URL: $url');
       String formattedUrl = url.trim();
       if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
         formattedUrl = 'https://$formattedUrl';
@@ -89,31 +91,29 @@ class LinksPageState extends State<LinksPage> {
       final uri = Uri.tryParse(formattedUrl);
       if (uri == null || !uri.hasScheme) {
         _showSnackBar('Invalid URL: $formattedUrl');
-        print('Invalid URL parsed: $formattedUrl'); // Debug log
+        print('Invalid URL parsed: $formattedUrl');
         return;
       }
 
-      print('Parsed URI: $uri'); // Debug log
-      // Attempt to open in default browser
+      print('Parsed URI: $uri');
       if (await canLaunchUrl(uri)) {
-        print('Launching URL in default browser: $uri'); // Debug log
+        print('Launching URL in default browser: $uri');
         await launchUrl(uri, mode: LaunchMode.platformDefault);
       } else {
-        print('Cannot launch URL in browser, trying fallback: $uri'); // Debug log
-        // Fallback: Try opening with a generic intent
+        print('Cannot launch URL in browser, trying fallback: $uri');
         final fallbackUri = Uri.parse('https://www.google.com');
         if (await canLaunchUrl(fallbackUri)) {
-          print('Launching fallback URL: $fallbackUri'); // Debug log
+          print('Launching fallback URL: $fallbackUri');
           await launchUrl(fallbackUri, mode: LaunchMode.platformDefault);
           _showSnackBar('No browser found for $formattedUrl, opened fallback');
         } else {
           _showSnackBar('No browser installed to open: $formattedUrl');
-          print('No browser available for URL: $uri'); // Debug log
+          print('No browser available for URL: $uri');
         }
       }
     } catch (e) {
       _showSnackBar('Error opening URL: $e');
-      print('Error opening URL: $e'); // Debug log
+      print('Error opening URL: $e');
     }
   }
 
@@ -137,6 +137,87 @@ class LinksPageState extends State<LinksPage> {
     } catch (e) {
       _showSnackBar('Error sharing link: $e');
     }
+  }
+
+  Future<void> _showEditNotesDialog(BuildContext context, LinkModel link) async {
+    final TextEditingController notesController = TextEditingController(text: link.notes ?? '');
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add/Edit Notes'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (link.imageUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: link.imageUrl,
+                    fit: BoxFit.cover,
+                    height: 150,
+                    width: double.infinity,
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        height: 150,
+                        color: Colors.grey[300],
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 150,
+                      color: Colors.grey[200],
+                      child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
+                    ),
+                  ),
+                ),
+              SizedBox(height: 8),
+              Text(
+                link.title,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                [
+                  if (link.description.isNotEmpty) link.description,
+                  'Domain: ${link.domain}',
+                  if (link.tags.isNotEmpty) 'Tags: ${link.tags.join(', ')}',
+                ].join('\n'),
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: notesController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: 'Notes',
+                  border: OutlineInputBorder(),
+                  hintText: 'Add your notes here...',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final updatedLink = link.copyWith(notes: notesController.text.isEmpty ? null : notesController.text);
+              await _dbHelper.updateLink(updatedLink);
+              await loadLinks();
+              Navigator.pop(context);
+              _showSnackBar('Notes saved');
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
@@ -172,6 +253,14 @@ class LinksPageState extends State<LinksPage> {
                 },
               ),
               ListTile(
+                leading: Icon(Icons.edit, color: Colors.blue),
+                title: Text('Add Description', style: TextStyle(color: Colors.blue)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditNotesDialog(context, link);
+                },
+              ),
+              ListTile(
                 leading: Icon(Icons.delete, color: Colors.red),
                 title: Text('Delete', style: TextStyle(color: Colors.red)),
                 onTap: () {
@@ -186,7 +275,6 @@ class LinksPageState extends State<LinksPage> {
     );
   }
 
-
   Widget _buildLinkItem(LinkModel link) {
     return Card(
       margin: EdgeInsets.all(8),
@@ -197,14 +285,11 @@ class LinksPageState extends State<LinksPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _openLink(link.url),
-        onLongPress: () {
-          _showLinkOptionsMenu(context, link);
-        },
+        onLongPress: () => _showLinkOptionsMenu(context, link),
         child: _isGridView ? _buildGridItem(link) : _buildListItem(link),
       ),
     );
   }
-
 
   Widget _buildGridItem(LinkModel link) {
     return LayoutBuilder(
@@ -224,7 +309,7 @@ class LinksPageState extends State<LinksPage> {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min, // Allow dynamic sizing
+            mainAxisSize: MainAxisSize.min,
             children: [
               Stack(
                 children: [
@@ -232,29 +317,25 @@ class LinksPageState extends State<LinksPage> {
                     borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
                     child: Container(
                       constraints: BoxConstraints(
-                        minHeight: constraints.maxWidth * 0.75, // Minimum height for consistency
-                        maxHeight: constraints.maxWidth * 0.95, // Allow taller images
+                        minHeight: constraints.maxWidth * 0.75,
+                        maxHeight: constraints.maxWidth * 0.95,
                       ),
                       color: Colors.grey[200],
                       child: link.imageUrl.isNotEmpty
-                          ? Image.network(
-                        link.imageUrl,
-                        fit: BoxFit.cover, // Use cover to crop landscape images
+                          ? CachedNetworkImage(
+                        imageUrl: link.imageUrl,
+                        fit: BoxFit.cover,
                         width: constraints.maxWidth,
-                        errorBuilder: (context, error, stackTrace) => Center(
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: Colors.grey[300]!,
+                          highlightColor: Colors.grey[100]!,
+                          child: Container(
+                            color: Colors.grey[300],
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Center(
                           child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
                         ),
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                                  : null,
-                            ),
-                          );
-                        },
                       )
                           : Center(
                         child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
@@ -333,6 +414,18 @@ class LinksPageState extends State<LinksPage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (link.notes != null && link.notes!.isNotEmpty) ...[
+                      SizedBox(height: 4),
+                      Text(
+                        link.notes!,
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 10,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -360,23 +453,19 @@ class LinksPageState extends State<LinksPage> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: link.imageUrl.isNotEmpty
-                  ? Image.network(
-                link.imageUrl,
+                  ? CachedNetworkImage(
+                imageUrl: link.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Center(
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(
+                    color: Colors.grey[300],
+                  ),
+                ),
+                errorWidget: (context, url, error) => Center(
                   child: Icon(Icons.link, color: Colors.grey[600]),
                 ),
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  );
-                },
               )
                   : Center(
                 child: Icon(Icons.link, color: Colors.grey[600]),
@@ -416,6 +505,18 @@ class LinksPageState extends State<LinksPage> {
                     fontSize: 12,
                   ),
                 ),
+                if (link.notes != null && link.notes!.isNotEmpty) ...[
+                  SizedBox(height: 4),
+                  Text(
+                    link.notes!,
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
             ),
           ),

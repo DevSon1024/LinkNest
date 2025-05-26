@@ -1,6 +1,7 @@
 name: link_saver
 description: A Flutter app to save and organize shared links
 publish_to: 'none'
+vesrionCode: 102
 version: 1.0.2+1
 
 environment:
@@ -26,6 +27,9 @@ dependencies:
   device_info_plus: ^11.4.0
   share_plus: ^11.0.0
   flutter_markdown: ^0.7.7
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  flutter_cache_manager: ^3.4.1
 
 dev_dependencies:
   flutter_test:

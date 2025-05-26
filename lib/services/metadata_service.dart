@@ -23,7 +23,7 @@ class MetadataService {
   }
 
   static Future<LinkModel?> extractMetadata(String url) async {
-    await _loadCache(); // Load cache on first call
+    await _loadCache();
     if (_cache.containsKey(url)) {
       return _cache[url];
     }
@@ -47,10 +47,12 @@ class MetadataService {
         imageUrl: imageUrl,
         createdAt: DateTime.now(),
         domain: domain,
+        tags: [],
+        notes: null,
       );
 
       _cache[url] = linkModel;
-      await _saveCache(); // Save to cache
+      await _saveCache();
       return linkModel;
     } catch (e) {
       print('Error extracting metadata: $e');
@@ -63,6 +65,8 @@ class MetadataService {
           imageUrl: '',
           createdAt: DateTime.now(),
           domain: uri.host,
+          tags: [],
+          notes: null,
         );
         _cache[url] = linkModel;
         await _saveCache();

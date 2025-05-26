@@ -67,7 +67,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.resumed) {
       print('App resumed, checking for shared data...');
-      // Small delay to ensure app is fully resumed
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted && !_isProcessingSharedLink) {
           _checkForInitialSharedMedia();
@@ -79,7 +78,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void _setupSharingIntent() {
     print('Setting up sharing intent subscription for media...');
 
-    // Listen to media sharing coming from outside the app while the app is in memory
     _intentMediaSub = ReceiveSharingIntent.instance.getMediaStream().listen(
           (List<SharedMediaFile> files) {
         print('Received shared media: ${files.map((f) => f.toMap())}');
@@ -101,10 +99,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       },
     );
 
-    // Get the media sharing coming from outside the app while the app is closed
     _checkForInitialSharedMedia();
-
-    // Setup periodic cleanup
     _setupPeriodicCleanup();
   }
 
@@ -113,16 +108,22 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (files != null && files.isNotEmpty) {
         print('Initial shared media received: ${files.map((f) => f.toMap())}');
         _processSharedMedia(files);
-        // Tell the library that we are done processing the intent
         ReceiveSharingIntent.instance.reset();
       }
     }).catchError((error) {
       print('Error getting initial media: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error getting initial media: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     });
   }
 
-  void _processSharedMedia(List<SharedMediaFile> files) async {
-    // Prevent concurrent processing
+  Future<void> _processSharedMedia(List<SharedMediaFile> files) async {
     if (_isProcessingSharedLink) {
       print('Already processing shared media, skipping: ${files.map((f) => f.toMap())}');
       return;
@@ -133,56 +134,67 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
     try {
       for (final file in files) {
-        final url = file.path; // Assuming path contains the URL or file path
+        final url = file.path;
         if (url.isEmpty) {
           print('No valid URL found in media: ${file.toMap()}');
           continue;
         }
 
-        // Create a unique key for this URL
         final linkKey = url.trim().toLowerCase();
-
-        // Check for duplicates
         if (_processedLinks.contains(linkKey)) {
           print('Duplicate media detected, skipping: $linkKey');
           continue;
         }
 
-        // Add to processed set
         _processedLinks.add(linkKey);
 
-        // Add the link (assuming addLinkFromUrl can handle media URLs)
+        // Ensure we're on HomeScreen before processing
+        if (_selectedIndex != 0) {
+          setState(() {
+            _selectedIndex = 0;
+            _pageController.jumpToPage(0);
+          });
+          await Future.delayed(Duration(milliseconds: 300));
+        }
+
         final success = await _homeScreenKey.currentState?.addLinkFromUrl(url);
 
         if (success == true) {
-          // Switch to links page to show the new link
+          print('Link saved successfully: $url');
+          // Navigate to LinksPage after saving
           setState(() {
             _selectedIndex = 1;
             _pageController.jumpToPage(1);
           });
 
-          // Refresh the links page after a short delay
           await Future.delayed(Duration(milliseconds: 300));
           if (mounted) {
             _linksPageKey.currentState?.loadLinks();
           }
 
-          // Show success message
           if (mounted) {
             ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Media saved successfully!'),
+                content: Text('Link saved successfully!'),
                 backgroundColor: Colors.green,
                 duration: Duration(seconds: 2),
               ),
             );
           }
-        } else if (success == false) {
-          print('Failed to save media or media already exists: $url');
+        } else {
+          print('Failed to save link or link already exists: $url');
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Link already exists or failed to save: $url'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
 
-        // Schedule cleanup of this entry after 2 seconds
         Timer(Duration(milliseconds: 2000), () {
           _processedLinks.remove(linkKey);
         });
@@ -193,13 +205,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error processing shared media'),
+            content: Text('Error processing shared media: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      // Reset processing flag after a delay
       Future.delayed(Duration(milliseconds: 1000), () {
         _isProcessingSharedLink = false;
       });
@@ -207,7 +218,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   void _setupPeriodicCleanup() {
-    // Clean up processed links periodically to prevent memory leaks
     _cleanupTimer = Timer.periodic(Duration(minutes: 5), (timer) {
       final oldSize = _processedLinks.length;
       _processedLinks.clear();
