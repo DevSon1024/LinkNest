@@ -6,9 +6,10 @@ import 'package:archive/archive_io.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sqflite/sqflite.dart';
 import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
 import 'permission_page.dart';
+import '../models/link_model.dart';
 
 class StorageSetting extends StatefulWidget {
   const StorageSetting({super.key});
@@ -37,7 +38,10 @@ class StorageSettingState extends State<StorageSetting> {
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 
@@ -57,57 +61,49 @@ class StorageSettingState extends State<StorageSetting> {
     }
 
     try {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Fetch links from database
       final links = await _dbHelper.getAllLinks();
       if (links.isEmpty) {
-        Navigator.of(context).pop(); // Close loading dialog
+        Navigator.of(context).pop();
         _showSnackBar('No links to export');
         return;
       }
 
-      // Create JSON data with proper structure
       final exportData = {
         'version': '1.0',
         'exported_at': DateTime.now().toIso8601String(),
         'links': links.map((link) => {
           'url': link.url,
-          'notes': link.notes ?? '',
-          'title': link.title ?? '',
-          'description': link.description ?? '',
-          'imageUrl': link.imageUrl ?? '',
-          'created_at': link.createdAt?.toIso8601String(),
+          'notes': link.notes,
+          'title': link.title,
+          'description': link.description,
+          'imageUrl': link.imageUrl,
+          'created_at': link.createdAt.toIso8601String(), // Removed ?. operator
         }).toList(),
       };
 
       final jsonString = jsonEncode(exportData);
 
-      // Debug: Print JSON length to verify content
       print('JSON data length: ${jsonString.length}');
       print('Number of links: ${links.length}');
 
-      // Get user-selected output directory
       final outputDir = await FilePicker.platform.getDirectoryPath();
       if (outputDir == null) {
-        Navigator.of(context).pop(); // Close loading dialog
+        Navigator.of(context).pop();
         _showSnackBar('No directory selected');
         return;
       }
 
-      // Create temporary directory for files
       final tempDir = await getTemporaryDirectory();
       final tempJsonFile = File('${tempDir.path}/links_backup.json');
 
-      // Write JSON to temporary file
       await tempJsonFile.writeAsString(jsonString, flush: true);
 
-      // Verify the JSON file was created and has content
       if (!await tempJsonFile.exists()) {
         Navigator.of(context).pop();
         _showSnackBar('Failed to create temporary JSON file');
@@ -124,19 +120,15 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Create ZIP file using Archive library
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final zipFilePath = '$outputDir/links_backup_$timestamp.zip';
 
-      // Read the JSON file content
       final jsonBytes = await tempJsonFile.readAsBytes();
 
-      // Create archive and add the JSON file
       final archive = Archive();
       final archiveFile = ArchiveFile('links_backup.json', jsonBytes.length, jsonBytes);
       archive.addFile(archiveFile);
 
-      // Encode archive to ZIP
       final zipData = ZipEncoder().encode(archive);
       if (zipData == null) {
         Navigator.of(context).pop();
@@ -145,11 +137,9 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Write ZIP file
       final zipFile = File(zipFilePath);
       await zipFile.writeAsBytes(zipData);
 
-      // Verify ZIP file was created
       if (!await zipFile.exists()) {
         Navigator.of(context).pop();
         _showSnackBar('Failed to create ZIP file');
@@ -160,14 +150,12 @@ class StorageSettingState extends State<StorageSetting> {
       final zipSize = await zipFile.length();
       print('ZIP file size: $zipSize bytes');
 
-      // Clean up temporary file
       await tempJsonFile.delete();
 
-      Navigator.of(context).pop(); // Close loading dialog
+      Navigator.of(context).pop();
       _showSnackBar('Data exported successfully to $zipFilePath');
-
     } catch (e) {
-      Navigator.of(context).pop(); // Close loading dialog if still open
+      Navigator.of(context).pop();
       print('Export error: $e');
       _showSnackBar('Error exporting data: $e');
     }
@@ -189,40 +177,41 @@ class StorageSettingState extends State<StorageSetting> {
     }
 
     try {
-      // Show file picker
       final result = await FilePicker.platform.pickFiles(
         allowedExtensions: ['zip'],
         type: FileType.custom,
         allowMultiple: false,
       );
 
-      if (result == null || result.files.isEmpty) {
+      if (result == null) {
+        _showSnackBar('No file selected');
+        return;
+      }
+      if (result.files.isEmpty) {
         _showSnackBar('No file selected');
         return;
       }
 
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      final zipFile = File(result.files.single.path!);
+      final zipFilePath = result.files.single.path!;
+      final zipFile = File(zipFilePath);
       if (!await zipFile.exists()) {
         Navigator.of(context).pop();
         _showSnackBar('Selected file does not exist');
         return;
       }
 
-      // Read and decode ZIP file
       final bytes = await zipFile.readAsBytes();
       print('ZIP file size: ${bytes.length} bytes');
 
       final archive = ZipDecoder().decodeBytes(bytes);
       print('Archive files: ${archive.files.map((f) => f.name).toList()}');
 
-      // Find the JSON file in the archive
       final jsonArchiveFile = archive.findFile('links_backup.json');
       if (jsonArchiveFile == null) {
         Navigator.of(context).pop();
@@ -230,7 +219,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Extract JSON content
       final jsonContent = jsonArchiveFile.content;
       if (jsonContent == null || jsonContent.isEmpty) {
         Navigator.of(context).pop();
@@ -247,7 +235,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Parse JSON data
       final Map<String, dynamic> backupData = jsonDecode(jsonString);
       final List<dynamic> linksData = backupData['links'] ?? [];
 
@@ -257,7 +244,8 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Import links
+      final db = await _dbHelper.database;
+      final batch = db.batch();
       int importedCount = 0;
       int updatedCount = 0;
 
@@ -265,63 +253,61 @@ class StorageSettingState extends State<StorageSetting> {
         try {
           final map = Map<String, dynamic>.from(linkData);
           final url = map['url'] as String?;
-
           if (url == null || url.isEmpty) {
             continue;
           }
 
           final notes = map['notes'] as String?;
-          final title = map['title'] as String?;
-          final description = map['description'] as String?;
-          final imageUrl = map['imageUrl'] as String?;
+          final title = map['title'] as String? ?? 'Untitled';
+          final description = map['description'] as String? ?? '';
+          final imageUrl = map['imageUrl'] as String? ?? '';
+          final createdAt = map['created_at'] != null
+              ? DateTime.parse(map['created_at'])
+              : DateTime.now();
 
-          // Check if link already exists
+          final uri = Uri.tryParse(url);
+          final domain = uri?.host ?? '';
+
+          final linkModel = LinkModel(
+            url: url,
+            title: title,
+            description: description,
+            imageUrl: imageUrl,
+            createdAt: createdAt,
+            domain: domain,
+            tags: [],
+            notes: notes,
+          );
+
           if (await _dbHelper.linkExists(url)) {
-            // Update existing link if it has notes or other data
             final existingLinks = await _dbHelper.getAllLinks();
             final existingLink = existingLinks.firstWhere((link) => link.url == url);
-
             if ((notes != null && notes.isNotEmpty) ||
-                (title != null && title.isNotEmpty) ||
-                (description != null && description.isNotEmpty) ||
-                (imageUrl != null && imageUrl.isNotEmpty)) {
-              await _dbHelper.updateLink(existingLink.copyWith(
-                notes: notes,
-                title: title ?? existingLink.title,
-                description: description ?? existingLink.description,
-                imageUrl: imageUrl ?? existingLink.imageUrl,
-              ));
+                (title.isNotEmpty && title != 'Untitled') ||
+                (description.isNotEmpty) ||
+                (imageUrl.isNotEmpty)) {
+              batch.update(
+                'links',
+                linkModel.toMap(),
+                where: 'id = ?',
+                whereArgs: [existingLink.id],
+              );
               updatedCount++;
             }
           } else {
-            // Create new link
-            try {
-              final metadata = await MetadataService.extractMetadata(url);
-              if (metadata != null) {
-                await _dbHelper.insertLink(metadata.copyWith(
-                  notes: notes,
-                  title: title ?? metadata.title,
-                  description: description ?? metadata.description,
-                  imageUrl: imageUrl ?? metadata.imageUrl,
-                ));
-                importedCount++;
-              }
-            } catch (metadataError) {
-              print('Error extracting metadata for $url: $metadataError');
-              // Continue with next link
-            }
+            batch.insert('links', linkModel.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+            importedCount++;
           }
         } catch (linkError) {
           print('Error processing link: $linkError');
-          // Continue with next link
         }
       }
 
-      Navigator.of(context).pop(); // Close loading dialog
+      await batch.commit(noResult: true);
+      Navigator.of(context).pop();
       _showSnackBar('Import completed: $importedCount new links, $updatedCount updated');
-
     } catch (e) {
-      Navigator.of(context).pop(); // Close loading dialog if still open
+      Navigator.of(context).pop();
       print('Import error: $e');
       _showSnackBar('Error importing data: $e');
     }
@@ -345,24 +331,89 @@ class StorageSettingState extends State<StorageSetting> {
     }
   }
 
+  Widget _buildActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required Color backgroundColor,
+    Color? iconColor,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: backgroundColor.withOpacity(0.1),
+                child: Icon(
+                  icon,
+                  color: iconColor ?? backgroundColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Storage Settings',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        elevation: 2,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: Icon(
-              _hasStoragePermission ? Icons.check_circle : Icons.warning,
-              color: _hasStoragePermission ? Colors.green : Colors.red,
+              _hasStoragePermission ? Icons.check_circle_rounded : Icons.warning_rounded,
+              color: _hasStoragePermission
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.error,
             ),
           ),
         ],
@@ -370,41 +421,55 @@ class StorageSettingState extends State<StorageSetting> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Backup & Restore',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            if (!_hasStoragePermission)
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_rounded,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Storage permission required for backup/restore operations',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (!_hasStoragePermission) const SizedBox(height: 16),
+            _buildActionCard(
+              icon: Icons.backup_rounded,
+              title: 'Export Data',
+              subtitle: 'Create a backup of all your saved links',
+              onTap: _exportData,
+              backgroundColor: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _exportData,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Export Data'),
+            _buildActionCard(
+              icon: Icons.restore_rounded,
+              title: 'Import Data',
+              subtitle: 'Restore links from a backup file',
+              onTap: _importData,
+              backgroundColor: Theme.of(context).colorScheme.secondary,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _importData,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Import Data'),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _clearCache,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Clear Cache'),
+            _buildActionCard(
+              icon: Icons.cleaning_services_rounded,
+              title: 'Clear Cache',
+              subtitle: 'Free up storage space by clearing cached data',
+              onTap: _clearCache,
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           ],
         ),

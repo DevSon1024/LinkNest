@@ -15,114 +15,129 @@ class HomeScreenState extends State<HomeScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
 
   Future<bool> addLinkFromUrl(String url) async {
-    print('HomeScreen: Adding link from URL: $url'); // Debug log
+    print('HomeScreen: Adding link from URL: $url');
 
     if (await _dbHelper.linkExists(url)) {
-      print('HomeScreen: Link already exists: $url'); // Debug log
-      // Don't show snackbar here - let the caller decide
-      return false; // Return false to indicate link already exists
+      print('HomeScreen: Link already exists: $url');
+      return false;
     }
 
     try {
-      print('HomeScreen: Extracting metadata for: $url'); // Debug log
+      print('HomeScreen: Extracting metadata for: $url');
       final linkModel = await MetadataService.extractMetadata(url);
 
       if (linkModel != null) {
-        print('HomeScreen: Metadata extracted, inserting link: ${linkModel.title}'); // Debug log
+        print('HomeScreen: Metadata extracted, inserting link: ${linkModel.title}');
         await _dbHelper.insertLink(linkModel);
         widget.onLinkAdded?.call();
-        // Don't show snackbar here - let the caller handle success message
         return true;
       } else {
-        print('HomeScreen: Failed to extract metadata for: $url'); // Debug log
-        // Don't show snackbar here - let the caller handle error
+        print('HomeScreen: Failed to extract metadata for: $url');
         return false;
       }
     } catch (e) {
-      print('HomeScreen: Error saving link: $e'); // Debug log
-      // Don't show snackbar here - let the caller handle error
+      print('HomeScreen: Error saving link: $e');
       return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'LinkNest',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: theme.colorScheme.surfaceTint,
+        elevation: 2,
+      ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.link,
-              size: 80,
-              color: Theme.of(context).primaryColor.withOpacity(0.7),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Welcome to LinkNest',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).primaryColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Share links from your browser or other apps to save them here',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          surfaceTintColor: theme.colorScheme.surfaceTint,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.link_rounded,
+                  size: 64,
+                  color: theme.colorScheme.primary,
                 ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            SizedBox(height: 10),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Links will be automatically saved when shared to LinkNest',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[500],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            SizedBox(height: 30),
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 40),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.blue.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.blue,
-                    size: 20,
+                const SizedBox(height: 16),
+                Text(
+                  'Welcome to LinkNest',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
                   ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Tap the + button below to add links manually',
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontSize: 13,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Share links from your browser or other apps to save them here.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Links are automatically saved when shared to LinkNest.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Use the + button to add links manually'),
+                        backgroundColor: theme.colorScheme.primary,
                       ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_rounded,
+                          color: theme.colorScheme.onPrimaryContainer,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Tap the + button below to add links manually',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

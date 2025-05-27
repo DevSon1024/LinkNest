@@ -6,6 +6,7 @@ import 'package:shimmer/shimmer.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LinksPage extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -16,16 +17,44 @@ class LinksPage extends StatefulWidget {
   LinksPageState createState() => LinksPageState();
 }
 
-class LinksPageState extends State<LinksPage> {
+class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<LinkModel> _links = [];
+  List<LinkModel> _selectedLinks = [];
   bool _isGridView = false;
   bool _isLoading = false;
+  bool _isSelectionMode = false;
+  late AnimationController _fabAnimationController;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _fabAnimationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _loadViewPreference();
     loadLinks();
+  }
+
+  @override
+  void dispose() {
+    _fabAnimationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadViewPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isGridView = prefs.getBool('links_page_view') ?? false;
+    });
+  }
+
+  Future<void> _saveViewPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('links_page_view', _isGridView);
   }
 
   Future<void> loadLinks() async {
@@ -41,10 +70,92 @@ class LinksPageState extends State<LinksPage> {
     }
   }
 
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedLinks.clear();
+      }
+    });
+    if (_isSelectionMode) {
+      _fabAnimationController.forward();
+    } else {
+      _fabAnimationController.reverse();
+    }
+  }
+
+  Future<void> _shareSelectedLinks() async {
+    if (_selectedLinks.isEmpty) return;
+
+    final linksText = _selectedLinks
+        .map((link) => '${link.title}\n${link.url}')
+        .join('\n\n');
+
+    try {
+      await Share.share(
+        linksText,
+        subject: 'Shared ${_selectedLinks.length} Links',
+      );
+    } catch (e) {
+      _showSnackBar('Error sharing links: $e');
+    }
+  }
+
+  void _toggleLinkSelection(LinkModel link) {
+    setState(() {
+      if (_selectedLinks.contains(link)) {
+        _selectedLinks.remove(link);
+      } else {
+        _selectedLinks.add(link);
+      }
+      if (_selectedLinks.isEmpty && _isSelectionMode) {
+        _toggleSelectionMode();
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedLinks() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Delete Links'),
+        content: Text('Are you sure you want to delete ${_selectedLinks.length} link(s)?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      for (final link in _selectedLinks) {
+        if (link.id != null) {
+          await _dbHelper.deleteLink(link.id!);
+        }
+      }
+      _selectedLinks.clear();
+      _toggleSelectionMode();
+      await loadLinks();
+      _showSnackBar('Links deleted successfully');
+    }
+  }
+
   Future<void> _deleteLink(LinkModel link) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Delete Link'),
         content: Text('Are you sure you want to delete this link?'),
         actions: [
@@ -54,8 +165,11 @@ class LinksPageState extends State<LinksPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -68,8 +182,12 @@ class LinksPageState extends State<LinksPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Link deleted'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           action: SnackBarAction(
             label: 'Undo',
+            textColor: Colors.blue,
             onPressed: () async {
               await _dbHelper.insertLink(deletedLink);
               await loadLinks();
@@ -91,29 +209,16 @@ class LinksPageState extends State<LinksPage> {
       final uri = Uri.tryParse(formattedUrl);
       if (uri == null || !uri.hasScheme) {
         _showSnackBar('Invalid URL: $formattedUrl');
-        print('Invalid URL parsed: $formattedUrl');
         return;
       }
 
-      print('Parsed URI: $uri');
       if (await canLaunchUrl(uri)) {
-        print('Launching URL in default browser: $uri');
         await launchUrl(uri, mode: LaunchMode.platformDefault);
       } else {
-        print('Cannot launch URL in browser, trying fallback: $uri');
-        final fallbackUri = Uri.parse('https://www.google.com');
-        if (await canLaunchUrl(fallbackUri)) {
-          print('Launching fallback URL: $fallbackUri');
-          await launchUrl(fallbackUri, mode: LaunchMode.platformDefault);
-          _showSnackBar('No browser found for $formattedUrl, opened fallback');
-        } else {
-          _showSnackBar('No browser installed to open: $formattedUrl');
-          print('No browser available for URL: $uri');
-        }
+        _showSnackBar('Cannot open link');
       }
     } catch (e) {
       _showSnackBar('Error opening URL: $e');
-      print('Error opening URL: $e');
     }
   }
 
@@ -124,7 +229,12 @@ class LinksPageState extends State<LinksPage> {
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 
@@ -144,6 +254,7 @@ class LinksPageState extends State<LinksPage> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Add/Edit Notes'),
         content: SingleChildScrollView(
           child: Column(
@@ -159,24 +270,24 @@ class LinksPageState extends State<LinksPage> {
                     height: 150,
                     width: double.infinity,
                     placeholder: (context, url) => Shimmer.fromColors(
-                      baseColor: Colors.grey[300]!,
-                      highlightColor: Colors.grey[100]!,
+                      baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      highlightColor: Theme.of(context).colorScheme.surfaceContainer,
                       child: Container(
                         height: 150,
-                        color: Colors.grey[300],
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
                       height: 150,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                      child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ),
                 ),
               SizedBox(height: 8),
               Text(
                 link.title,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 8),
               Text(
@@ -185,7 +296,7 @@ class LinksPageState extends State<LinksPage> {
                   'Domain: ${link.domain}',
                   if (link.tags.isNotEmpty) 'Tags: ${link.tags.join(', ')}',
                 ].join('\n'),
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               SizedBox(height: 16),
               TextField(
@@ -223,13 +334,27 @@ class LinksPageState extends State<LinksPage> {
   void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
     showModalBottomSheet(
       context: context,
-      builder: (context) {
-        return SafeArea(
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               ListTile(
-                leading: Icon(Icons.open_in_new),
+                leading: Icon(Icons.open_in_new, color: Theme.of(context).colorScheme.onSurface),
                 title: Text('Open Link'),
                 onTap: () {
                   Navigator.pop(context);
@@ -237,7 +362,15 @@ class LinksPageState extends State<LinksPage> {
                 },
               ),
               ListTile(
-                leading: Icon(Icons.copy),
+                leading: Icon(Icons.edit, color: Colors.blue),
+                title: Text('Add/Edit Description', style: TextStyle(color: Colors.blue)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditNotesDialog(context, link);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.copy, color: Theme.of(context).colorScheme.onSurface),
                 title: Text('Copy URL'),
                 onTap: () {
                   Navigator.pop(context);
@@ -245,19 +378,11 @@ class LinksPageState extends State<LinksPage> {
                 },
               ),
               ListTile(
-                leading: Icon(Icons.share),
+                leading: Icon(Icons.share, color: Theme.of(context).colorScheme.onSurface),
                 title: Text('Share'),
                 onTap: () {
                   Navigator.pop(context);
                   _shareLink(link.url, link.title);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.edit, color: Colors.blue),
-                title: Text('Add Description', style: TextStyle(color: Colors.blue)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showEditNotesDialog(context, link);
                 },
               ),
               ListTile(
@@ -268,261 +393,365 @@ class LinksPageState extends State<LinksPage> {
                   _deleteLink(link);
                 },
               ),
+              SizedBox(height: 16),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildLinkItem(LinkModel link) {
-    return Card(
-      margin: EdgeInsets.all(8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => _openLink(link.url),
-        onLongPress: () => _showLinkOptionsMenu(context, link),
-        child: _isGridView ? _buildGridItem(link) : _buildListItem(link),
+        ),
       ),
     );
   }
 
-  Widget _buildGridItem(LinkModel link) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
+  Widget _buildLinkCard(LinkModel link) {
+    final isSelected = _selectedLinks.contains(link);
+
+    if (_isGridView) {
+      return GestureDetector(
+        onTap: () {
+          if (_isSelectionMode) {
+            _toggleLinkSelection(link);
+          } else {
+            _openLink(link.url);
+          }
+        },
+        onLongPress: () {
+          if (!_isSelectionMode) {
+            _toggleSelectionMode();
+          }
+          _toggleLinkSelection(link);
+        },
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 200),
+          margin: EdgeInsets.all(6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                spreadRadius: 1,
-                blurRadius: 3,
+                color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
+                blurRadius: 8,
                 offset: Offset(0, 2),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
+          child: Stack(
             children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                    child: Container(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxWidth * 0.75,
-                        maxHeight: constraints.maxWidth * 0.95,
-                      ),
-                      color: Colors.grey[200],
-                      child: link.imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                        imageUrl: link.imageUrl,
-                        fit: BoxFit.cover,
-                        width: constraints.maxWidth,
-                        placeholder: (context, url) => Shimmer.fromColors(
-                          baseColor: Colors.grey[300]!,
-                          highlightColor: Colors.grey[100]!,
-                          child: Container(
-                            color: Colors.grey[300],
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: isSelected
+                      ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                      : null,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          color: Theme.of(context).colorScheme.surfaceContainer,
+                          child: link.imageUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                            imageUrl: link.imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Shimmer.fromColors(
+                              baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              highlightColor: Theme.of(context).colorScheme.surfaceContainer,
+                              child: Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                            ),
+                            errorWidget: (context, url, error) => Center(
+                              child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                          )
+                              : Center(
+                            child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         ),
-                        errorWidget: (context, url, error) => Center(
-                          child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
-                        ),
-                      )
-                          : Center(
-                        child: Icon(Icons.link, size: 40, color: Colors.grey[600]),
                       ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        shape: BoxShape.circle,
-                      ),
-                      child: PopupMenuButton<String>(
-                        icon: Icon(Icons.more_vert, size: 20, color: Colors.grey[800]),
-                        onSelected: (value) {
-                          if (value == 'delete') {
-                            _deleteLink(link);
-                          } else if (value == 'copy') {
-                            _copyUrl(link.url);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              link.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 6),
+                            Row(
                               children: [
-                                Icon(Icons.delete_outline, size: 18),
-                                SizedBox(width: 8),
-                                Text('Delete'),
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  ),
+                                  child: Icon(
+                                    Icons.language,
+                                    size: 10,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    link.domain,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                          PopupMenuItem(
-                            value: 'copy',
-                            child: Row(
-                              children: [
-                                Icon(Icons.copy, size: 18),
-                                SizedBox(width: 8),
-                                Text('Copy URL'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        link.title,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          height: 1.2,
+                            if (link.notes != null && link.notes!.isNotEmpty) ...[
+                              SizedBox(height: 6),
+                              Text(
+                                link.notes!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ],
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      link.domain,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 10,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (link.notes != null && link.notes!.isNotEmpty) ...[
-                      SizedBox(height: 4),
-                      Text(
-                        link.notes!,
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 10,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
+              if (_isSelectionMode)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: AnimatedScale(
+                    scale: isSelected ? 1.0 : 0.8,
+                    duration: Duration(milliseconds: 200),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                        border: Border.all(
+                          color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.onPrimary)
+                          : null,
+                    ),
+                  ),
+                ),
+              if (!_isSelectionMode)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => _showLinkOptionsMenu(context, link),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                      child: Icon(
+                        Icons.more_vert,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.surface,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildListItem(LinkModel link) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            margin: EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: link.imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                imageUrl: link.imageUrl,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(
-                    color: Colors.grey[300],
-                  ),
-                ),
-                errorWidget: (context, url, error) => Center(
-                  child: Icon(Icons.link, color: Colors.grey[600]),
-                ),
-              )
-                  : Center(
-                child: Icon(Icons.link, color: Colors.grey[600]),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+        ),
+      );
+    } else {
+      return Card(
+        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            if (_isSelectionMode) {
+              _toggleLinkSelection(link);
+            } else {
+              _openLink(link.url);
+            }
+          },
+          onLongPress: () {
+            if (!_isSelectionMode) {
+              _toggleSelectionMode();
+            }
+            _toggleLinkSelection(link);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                Text(
-                  link.title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 4),
-                if (link.description.isNotEmpty)
-                  Text(
-                    link.description,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 14,
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                  child: link.imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                    imageUrl: link.imageUrl,
+                    placeholder: (context, url) => Icon(
+                      Icons.link,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                SizedBox(height: 4),
-                Text(
-                  link.domain,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
+                    errorWidget: (context, url, error) => Icon(
+                      Icons.link,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    fit: BoxFit.cover,
+                  )
+                      : Icon(
+                    Icons.link,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-                if (link.notes != null && link.notes!.isNotEmpty) ...[
-                  SizedBox(height: 4),
-                  Text(
-                    link.notes!,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 14,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        link.title,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (link.description.isNotEmpty) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          link.description,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      SizedBox(height: 4),
+                      Text(
+                        link.domain,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (link.notes != null && link.notes!.isNotEmpty) ...[
+                        SizedBox(height: 4),
+                        Text(
+                          link.notes!,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
+                if (_isSelectionMode)
+                  AnimatedScale(
+                    scale: isSelected ? 1.0 : 0.8,
+                    duration: Duration(milliseconds: 200),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                        border: Border.all(
+                          color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.onPrimary)
+                          : null,
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => _showLinkOptionsMenu(context, link),
+                    child: Icon(
+                      Icons.more_vert,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: Colors.red),
-            onPressed: () => _deleteLink(link),
+        ),
+      );
+    }
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.bookmark_border,
+            size: 80,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No links saved yet',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Add links manually or share them from other apps to get started',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: loadLinks,
+            icon: Icon(Icons.refresh),
+            label: Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ),
@@ -532,78 +761,84 @@ class LinksPageState extends State<LinksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Saved Links',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(_isGridView ? Icons.list : Icons.grid_view),
-                  onPressed: () => setState(() => _isGridView = !_isGridView),
-                  tooltip: _isGridView ? 'List view' : 'Grid view',
-                ),
-              ],
+      appBar: AppBar(
+        title: const Text(
+          'Saved Links',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        elevation: 2,
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : _links.isEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.link_off, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    'No links saved yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 40),
-                    child: Text(
-                      'Add links manually or share them from other apps',
-                      style: TextStyle(color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
-              ),
-            )
-                : RefreshIndicator(
-              onRefresh: loadLinks,
-              child: _isGridView
-                  ? Padding(
-                padding: EdgeInsets.all(8),
-                child: GridView.builder(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.75,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: _links.length,
-                  itemBuilder: (context, index) => _buildLinkItem(_links[index]),
-                ),
-              )
-                  : ListView.builder(
-                padding: EdgeInsets.only(bottom: 80.0, top: 8),
-                itemCount: _links.length,
-                itemBuilder: (context, index) => _buildLinkItem(_links[index]),
-              ),
-            ),
+            onPressed: () {
+              setState(() {
+                _isGridView = !_isGridView;
+                _saveViewPreference();
+              });
+            },
+            tooltip: _isGridView ? 'List view' : 'Grid view',
           ),
         ],
       ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : _links.isEmpty
+          ? _buildEmptyState()
+          : RefreshIndicator(
+        onRefresh: loadLinks,
+        child: _isGridView
+            ? GridView.builder(
+          controller: _scrollController,
+          padding: EdgeInsets.only(bottom: 80),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.75,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+          ),
+          itemCount: _links.length,
+          itemBuilder: (context, index) => _buildLinkCard(_links[index]),
+        )
+            : ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.only(bottom: 100, top: 16),
+          itemCount: _links.length,
+          itemBuilder: (context, index) => _buildLinkCard(_links[index]),
+        ),
+      ),
+      floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
+          ? Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          AnimatedScale(
+            scale: 1.0,
+            duration: Duration(milliseconds: 300),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: FloatingActionButton(
+                onPressed: _shareSelectedLinks,
+                backgroundColor: Colors.blue,
+                child: Icon(Icons.share, color: Colors.white),
+              ),
+            ),
+          ),
+          AnimatedScale(
+            scale: 1.0,
+            duration: Duration(milliseconds: 300),
+            child: FloatingActionButton(
+              onPressed: _deleteSelectedLinks,
+              backgroundColor: Colors.red,
+              child: Icon(Icons.delete, color: Colors.white),
+            ),
+          ),
+        ],
+      )
+          : null,
     );
   }
 }

@@ -16,6 +16,7 @@ class InputPageState extends State<InputPage> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final TextEditingController _urlController = TextEditingController();
   List<String> _recentUrls = [];
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class InputPageState extends State<InputPage> {
   }
 
   Future<void> _loadRecentUrls() async {
+    setState(() => _isLoading = true);
     try {
       final links = await _dbHelper.getAllLinks();
       setState(() {
@@ -37,6 +39,8 @@ class InputPageState extends State<InputPage> {
       });
     } catch (e) {
       _showSnackBar('Error loading recent URLs: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -52,6 +56,7 @@ class InputPageState extends State<InputPage> {
       return;
     }
 
+    setState(() => _isLoading = true);
     try {
       final linkModel = await MetadataService.extractMetadata(url);
       if (linkModel != null) {
@@ -65,12 +70,17 @@ class InputPageState extends State<InputPage> {
       }
     } catch (e) {
       _showSnackBar('Error saving link: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+      ),
     );
   }
 
@@ -79,80 +89,204 @@ class InputPageState extends State<InputPage> {
     _showSnackBar('URL copied to clipboard');
   }
 
+  Widget _buildRecentUrlCard(String url) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _copyUrl(url),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                child: Icon(
+                  Icons.link_rounded,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  url,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    decoration: TextDecoration.underline,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.copy_rounded,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                onPressed: () => _copyUrl(url),
+                tooltip: 'Copy URL',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-            'Add New Link',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          'Add New Link',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+        elevation: 2,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _urlController,
-              decoration: const InputDecoration(
-                hintText: 'Enter URL (e.g., https://example.com)',
-                border: OutlineInputBorder(),
-                labelText: 'URL',
-              ),
-              keyboardType: TextInputType.url,
-              onSubmitted: (_) => _addLink(),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Input Section
+          Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _addLink,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Add Link'),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _urlController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter URL (e.g., https://example.com)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    labelText: 'URL',
+                    prefixIcon: const Icon(Icons.link_rounded),
+                    suffixIcon: _urlController.text.isNotEmpty
+                        ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _urlController.clear();
+                        setState(() {});
+                      },
+                    )
+                        : null,
+                  ),
+                  keyboardType: TextInputType.url,
+                  onSubmitted: (_) => _addLink(),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _addLink,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                    )
+                        : const Text(
+                      'Add Link',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            Text(
+          ),
+
+          // Recent URLs Section
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
               'Recent URLs',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _recentUrls.isEmpty
-                  ? const Center(child: Text('No recent URLs added yet'))
-                  : ListView.builder(
+          ),
+
+          // Recent URLs List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _recentUrls.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.link_off_rounded,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No recent URLs',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      'Add your first link to see recent URLs here',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : RefreshIndicator(
+              onRefresh: _loadRecentUrls,
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 80, top: 0),
                 itemCount: _recentUrls.length,
                 itemBuilder: (context, index) {
-                  final url = _recentUrls[index];
-                  return ListTile(
-                    title: Text(
-                      url,
-                      style: const TextStyle(
-                        color: Colors.blue,
-                        decoration: TextDecoration.underline,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    onTap: () => _copyUrl(url),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.copy, size: 20),
-                      onPressed: () => _copyUrl(url),
-                    ),
-                  );
+                  return _buildRecentUrlCard(_recentUrls[index]);
                 },
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

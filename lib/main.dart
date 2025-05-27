@@ -22,6 +22,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
+        useMaterial3: true, // Enable Material 3 for modern Android look
       ),
       home: const MainScreen(),
       debugShowCheckedModeBanner: false,
@@ -154,7 +155,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
         _processedLinks.add(linkKey);
 
-        // Ensure we're on HomeScreen before processing
         if (_selectedIndex != 0) {
           setState(() {
             _selectedIndex = 0;
@@ -167,7 +167,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
         if (success == true) {
           print('Link saved successfully: $url');
-          // Navigate to LinksPage after saving
           setState(() {
             _selectedIndex = 1;
             _pageController.jumpToPage(1);
@@ -275,23 +274,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(
-        title: const Text(
-          'LinkNest',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor,
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(15),
-            ),
-          ),
-        ),
-      ),
+      extendBody: true,
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
@@ -323,25 +306,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 10.0,
-        color: Theme.of(context).primaryColor,
-        elevation: 0,
+        color: Theme.of(context).colorScheme.primary,
+        elevation: 2,
         clipBehavior: Clip.antiAlias,
         child: SizedBox(
           height: 71.0,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(0, Icons.home, Icons.home_outlined, 'Home'),
-              _buildNavItem(1, Icons.link, Icons.link_outlined, 'Links'),
-              const SizedBox(width: 40), // Gap for FAB
-              _buildNavItem(2, Icons.folder, Icons.folder_outlined, 'Folders'),
-              _buildNavItem(3, Icons.menu, Icons.menu_outlined, 'Menu'),
+              _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
+              _buildNavItem(1, Icons.link_rounded, Icons.link_outlined, 'Links'),
+              const SizedBox(width: 40),
+              _buildNavItem(2, Icons.folder_rounded, Icons.folder_outlined, 'Folders'),
+              _buildNavItem(3, Icons.menu_rounded, Icons.menu_outlined, 'Menu'),
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Theme.of(context).primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         onPressed: () {
           Navigator.push(
             context,
@@ -357,11 +341,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         },
         shape: const CircleBorder(),
         elevation: 4,
-        child: Icon(
-          Icons.add,
-          color: Theme.of(context).colorScheme.onPrimary,
-          size: 50.0,
-        ),
+        child: const Icon(Icons.add, size: 32),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
