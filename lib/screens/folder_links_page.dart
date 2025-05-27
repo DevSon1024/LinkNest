@@ -24,7 +24,7 @@ class FolderLinksPage extends StatefulWidget {
 
 class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  List<LinkModel> _selectedLinks = [];
+  final List<LinkModel> _selectedLinks = [];
   bool _isGridView = false;
   bool _isSelectionMode = false;
   late AnimationController _fabAnimationController;
@@ -34,7 +34,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
   void initState() {
     super.initState();
     _fabAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     _loadViewPreference();
@@ -108,12 +108,12 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Links'),
+        title: const Text('Delete Links'),
         content: Text('Are you sure you want to delete ${_selectedLinks.length} link(s)?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -121,7 +121,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text('Delete', style: TextStyle(color: Colors.white)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -146,12 +146,12 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Link'),
-        content: Text('Are you sure you want to delete this link?'),
+        title: const Text('Delete Link'),
+        content: const Text('Are you sure you want to delete this link?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -159,7 +159,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text('Delete', style: TextStyle(color: Colors.white)),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -173,7 +173,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Link deleted'),
+          content: const Text('Link deleted'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -250,7 +250,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Add/Edit Notes'),
+        title: const Text('Add/Edit Notes'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -279,12 +279,12 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                     ),
                   ),
                 ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 link.title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 [
                   if (link.description.isNotEmpty) link.description,
@@ -293,11 +293,11 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                 ].join('\n'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               TextField(
                 controller: notesController,
                 maxLines: 4,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Notes',
                   border: OutlineInputBorder(),
                   hintText: 'Add your notes here...',
@@ -309,7 +309,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -324,7 +324,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               Navigator.pop(context);
               _showSnackBar('Notes saved');
             },
-            child: Text('Save'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -338,7 +338,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       builder: (context) => Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           child: Column(
@@ -347,7 +347,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               Container(
                 width: 40,
                 height: 4,
-                margin: EdgeInsets.symmetric(vertical: 12),
+                margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(2),
@@ -355,15 +355,15 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               ),
               ListTile(
                 leading: Icon(Icons.open_in_new, color: Theme.of(context).colorScheme.onSurface),
-                title: Text('Open Link'),
+                title: const Text('Open Link'),
                 onTap: () {
                   Navigator.pop(context);
                   _openLink(link.url);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.edit, color: Colors.blue),
-                title: Text('Add/Edit Description', style: TextStyle(color: Colors.blue)),
+                leading: const Icon(Icons.edit, color: Colors.blue),
+                title: const Text('Add/Edit Description', style: TextStyle(color: Colors.blue)),
                 onTap: () {
                   Navigator.pop(context);
                   _showEditNotesDialog(context, link);
@@ -371,7 +371,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               ),
               ListTile(
                 leading: Icon(Icons.copy, color: Theme.of(context).colorScheme.onSurface),
-                title: Text('Copy URL'),
+                title: const Text('Copy URL'),
                 onTap: () {
                   Navigator.pop(context);
                   _copyUrl(link.url);
@@ -379,21 +379,21 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               ),
               ListTile(
                 leading: Icon(Icons.share, color: Theme.of(context).colorScheme.onSurface),
-                title: Text('Share'),
+                title: const Text('Share'),
                 onTap: () {
                   Navigator.pop(context);
                   _shareLink(link.url, link.title);
                 },
               ),
               ListTile(
-                leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('Delete', style: TextStyle(color: Colors.red)),
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Delete', style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
                   _deleteLink(link);
                 },
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -420,15 +420,15 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
           _toggleLinkSelection(link);
         },
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 200),
-          margin: EdgeInsets.all(6),
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
                 blurRadius: 8,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -469,14 +469,14 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(12),
                         color: Theme.of(context).colorScheme.surface,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               link.title,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                                 height: 1.3,
@@ -484,7 +484,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Row(
                               children: [
                                 Container(
@@ -500,7 +500,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     link.domain,
@@ -515,7 +515,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                               ],
                             ),
                             if (link.notes != null && link.notes!.isNotEmpty) ...[
-                              SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               Text(
                                 link.notes!,
                                 style: TextStyle(
@@ -539,7 +539,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                   right: 8,
                   child: AnimatedScale(
                     scale: isSelected ? 1.0 : 0.8,
-                    duration: Duration(milliseconds: 200),
+                    duration: const Duration(milliseconds: 200),
                     child: Container(
                       width: 24,
                       height: 24,
@@ -584,7 +584,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       );
     } else {
       return Card(
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
@@ -643,7 +643,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (link.description.isNotEmpty) ...[
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           link.description,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -653,7 +653,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         link.domain,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -663,7 +663,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (link.notes != null && link.notes!.isNotEmpty) ...[
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           link.notes!,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -679,7 +679,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                 if (_isSelectionMode)
                   AnimatedScale(
                     scale: isSelected ? 1.0 : 0.8,
-                    duration: Duration(milliseconds: 200),
+                    duration: const Duration(milliseconds: 200),
                     child: Container(
                       width: 24,
                       height: 24,
@@ -722,16 +722,16 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
             size: 80,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'No links in this folder',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Links in this folder will appear here',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -751,7 +751,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       appBar: AppBar(
         title: Text(
           widget.folderName,
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
@@ -781,8 +781,8 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
         child: _isGridView
             ? GridView.builder(
           controller: _scrollController,
-          padding: EdgeInsets.only(bottom: 80),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          padding: const EdgeInsets.only(bottom: 80),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             childAspectRatio: 0.75,
             crossAxisSpacing: 4,
@@ -804,23 +804,23 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
         children: [
           AnimatedScale(
             scale: 1.0,
-            duration: Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 300),
             child: Padding(
               padding: const EdgeInsets.only(right: 16.0),
               child: FloatingActionButton(
                 onPressed: _shareSelectedLinks,
                 backgroundColor: Colors.blue,
-                child: Icon(Icons.share, color: Colors.white),
+                child: const Icon(Icons.share, color: Colors.white),
               ),
             ),
           ),
           AnimatedScale(
             scale: 1.0,
-            duration: Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 300),
             child: FloatingActionButton(
               onPressed: _deleteSelectedLinks,
               backgroundColor: Colors.red,
-              child: Icon(Icons.delete, color: Colors.white),
+              child: const Icon(Icons.delete, color: Colors.white),
             ),
           ),
         ],

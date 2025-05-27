@@ -130,12 +130,6 @@ class StorageSettingState extends State<StorageSetting> {
       archive.addFile(archiveFile);
 
       final zipData = ZipEncoder().encode(archive);
-      if (zipData == null) {
-        Navigator.of(context).pop();
-        _showSnackBar('Failed to create ZIP archive');
-        await tempJsonFile.delete();
-        return;
-      }
 
       final zipFile = File(zipFilePath);
       await zipFile.writeAsBytes(zipData);
@@ -220,7 +214,7 @@ class StorageSettingState extends State<StorageSetting> {
       }
 
       final jsonContent = jsonArchiveFile.content;
-      if (jsonContent == null || jsonContent.isEmpty) {
+      if (jsonContent.isEmpty) {
         Navigator.of(context).pop();
         _showSnackBar('JSON file in backup is empty');
         return;

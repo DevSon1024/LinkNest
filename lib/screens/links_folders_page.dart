@@ -18,7 +18,7 @@ class LinksFoldersPage extends StatefulWidget {
 class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   Map<String, List<LinkModel>> _folders = {};
-  List<String> _selectedFolders = [];
+  final List<String> _selectedFolders = [];
   bool _isGridView = false;
   bool _isLoading = false;
   bool _isSelectionMode = false;
@@ -29,7 +29,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
   void initState() {
     super.initState();
     _fabAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     _loadViewPreference();
@@ -162,7 +162,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
       builder: (context) => Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           child: Column(
@@ -171,7 +171,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
               Container(
                 width: 40,
                 height: 4,
-                margin: EdgeInsets.symmetric(vertical: 12),
+                margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(2),
@@ -179,7 +179,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
               ),
               ListTile(
                 leading: Icon(Icons.folder_open, color: Theme.of(context).colorScheme.onSurface),
-                title: Text('Open Folder'),
+                title: const Text('Open Folder'),
                 subtitle: Text('${links.length} link${links.length == 1 ? '' : 's'}'),
                 onTap: () {
                   Navigator.pop(context);
@@ -196,13 +196,13 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
               ),
               ListTile(
                 leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface),
-                title: Text('Folder Info'),
+                title: const Text('Folder Info'),
                 onTap: () {
                   Navigator.pop(context);
                   _showFolderInfo(context, folderName);
                 },
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -234,7 +234,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                 fit: BoxFit.cover,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 folderName,
@@ -253,14 +253,14 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
               'Total Links: ${links.length}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Domain: ${links.first.domain}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Latest Link: ${links.first.createdAt.toString().split(' ')[0]}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -272,7 +272,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+            child: const Text('Close'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -287,7 +287,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                 ),
               ).then((_) => loadFolders());
             },
-            child: Text('Open Folder'),
+            child: const Text('Open Folder'),
           ),
         ],
       ),
@@ -322,15 +322,15 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
           _toggleFolderSelection(folderName);
         },
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 200),
-          margin: EdgeInsets.all(6),
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
                 blurRadius: 8,
-                offset: Offset(0, 2),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -382,14 +382,14 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(12),
                         color: Theme.of(context).colorScheme.surface,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               folderName,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                                 height: 1.3,
@@ -397,7 +397,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Row(
                               children: [
                                 Container(
@@ -413,7 +413,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
                                     '${links.length} link${links.length == 1 ? '' : 's'}',
@@ -440,7 +440,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                   right: 8,
                   child: AnimatedScale(
                     scale: isSelected ? 1.0 : 0.8,
-                    duration: Duration(milliseconds: 200),
+                    duration: const Duration(milliseconds: 200),
                     child: Container(
                       width: 24,
                       height: 24,
@@ -485,7 +485,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
       );
     } else {
       return Card(
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
@@ -561,7 +561,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           '${links.length} link${links.length == 1 ? '' : 's'}',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -570,7 +570,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           'Domain: ${links.first.domain}',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -585,7 +585,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                   if (_isSelectionMode)
                     AnimatedScale(
                       scale: isSelected ? 1.0 : 0.8,
-                      duration: Duration(milliseconds: 200),
+                      duration: const Duration(milliseconds: 200),
                       child: Container(
                         width: 24,
                         height: 24,
@@ -629,16 +629,16 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
             size: 80,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'No folders found',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Add links to organize them by domain into folders',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -647,11 +647,11 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
               textAlign: TextAlign.center,
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: loadFolders,
-            icon: Icon(Icons.refresh),
-            label: Text('Refresh'),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -693,7 +693,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _folders.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
@@ -701,8 +701,8 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         child: _isGridView
             ? GridView.builder(
           controller: _scrollController,
-          padding: EdgeInsets.only(bottom: 80),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          padding: const EdgeInsets.only(bottom: 80),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             childAspectRatio: 0.85,
             crossAxisSpacing: 4,
