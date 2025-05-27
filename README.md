@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/icon.png" width="160" height="160" />
+<img src="assets/logo.png" width="160" height="160" />
 
 # LinkNest
 
