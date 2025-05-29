@@ -812,31 +812,34 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         ),
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
-          ? Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          AnimatedScale(
-            scale: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: FloatingActionButton(
-                onPressed: _shareSelectedLinks,
-                backgroundColor: Colors.blue,
-                child: const Icon(Icons.share, color: Colors.white),
+          ? Padding(
+        padding: const EdgeInsets.only(bottom: 80.0), // Adjusted to be above the bottom navigation bar
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16.0),
+                child: FloatingActionButton(
+                  onPressed: _shareSelectedLinks,
+                  backgroundColor: Colors.blue,
+                  child: const Icon(Icons.share, color: Colors.white),
+                ),
               ),
             ),
-          ),
-          AnimatedScale(
-            scale: 1.0,
-            duration: const Duration(milliseconds: 300),
-            child: FloatingActionButton(
-              onPressed: _deleteSelectedLinks,
-              backgroundColor: Colors.red,
-              child: const Icon(Icons.delete, color: Colors.white),
+            AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: FloatingActionButton(
+                onPressed: _deleteSelectedLinks,
+                backgroundColor: Colors.red,
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       )
           : null,
     );
