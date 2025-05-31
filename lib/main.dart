@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'screens/home_screen.dart';
 import 'screens/links_page.dart';
 import 'screens/links_folders_page.dart';
 import 'screens/input_page.dart';
 import 'screens/menu_page.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'screens/theme_notifier.dart';
 import 'dart:async';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  runApp(const LinkNestApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class LinkNestApp extends StatelessWidget {
+  const LinkNestApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'LinkNest',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        useMaterial3: true, // Enable Material 3 for modern Android look
+    return ChangeNotifierProvider(
+      create: (context) => ThemeNotifier(),
+      child: Consumer<ThemeNotifier>(
+        builder: (context, themeNotifier, child) {
+          return MaterialApp(
+            title: 'LinkNest',
+            theme: themeNotifier.getThemeData(),
+            darkTheme: themeNotifier.getThemeData(isDark: true),
+            themeMode: themeNotifier.themeMode,
+            home: const MainScreen(),
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
-      home: const MainScreen(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -45,7 +52,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   final GlobalKey<LinksPageState> _linksPageKey = GlobalKey<LinksPageState>();
   final GlobalKey<LinksFoldersPageState> _foldersPageKey = GlobalKey<LinksFoldersPageState>();
 
-  // Sharing intent variables
   late StreamSubscription _intentMediaSub;
   bool _isProcessingSharedLink = false;
   final Set<String> _processedLinks = <String>{};

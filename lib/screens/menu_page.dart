@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'storage_setting.dart';
 import 'version_page.dart';
+import 'display_setting.dart';
 
 class MenuPage extends StatelessWidget {
   const MenuPage({super.key});
@@ -21,6 +22,17 @@ class MenuPage extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            _buildMenuItem(
+              context,
+              icon: Icons.palette_rounded,
+              title: 'Display Settings',
+              subtitle: 'Theme and appearance options',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DisplaySetting()),
+              ),
+            ),
+            const SizedBox(height: 16),
             _buildMenuItem(
               context,
               icon: Icons.storage_rounded,
