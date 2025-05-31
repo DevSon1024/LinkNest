@@ -1,3 +1,32 @@
+# LinkNest v1.0.2 Release Notes
+*Released on May 28, 2025*
+
+We're back with a powerful update to make your link-saving experience smoother, smarter, and more organized! 🚀
+
+## What's New in v1.0.2
+
+### ✨ UI & Experience Upgrades
+- **Material You (Material3) Redesign**: Enjoy a modern, Android-native UI that's cleaner, smoother, and more responsive.
+- **Shimmer Loading Animations**: Visually engaging placeholders while previews load.
+- **Thumbnail Caching**: Link previews now load faster with smart caching of thumbnails. You can clear the cache from the settings menu.
+
+### 🆕 New Features
+- **Add Descriptions to Links**: Attach notes to any saved link to remember context or add quick thoughts.
+- **Auto-Categorized Folders**: Links are now automatically sorted into folders by domain — like YouTube, Instagram, Reddit, etc. — for better organization.
+
+### 🛠 Bug Fixes
+- Fixed: Links not saving properly when shared from browsers.
+- Fixed: Browser-specific link sharing issues.
+- Fixed: Backup option for URLs and notes has been fully rewritten for improved reliability.
+
+## Known Issues
+- Some previews may still fail to load due to limitations in website metadata.
+- Preview cache may increase storage usage over time; remember to use the cache clear option if needed.
+
+## Feedback
+We’re always improving LinkNest based on your suggestions. Drop us your thoughts, ideas, or bug reports via the app settings or reach us directly at [support](mailto:dpsonawane789@gmail.com).
+
+
 # LinkNest v1.0.0 Release Notes
 
 *Released on May 24, 2025*

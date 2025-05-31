@@ -198,7 +198,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _openLink(String url) async {
+  Future<void> _openLink(String url, {bool useDefaultBrowser = false}) async {
     try {
       print('Attempting to open URL: $url');
       String formattedUrl = url.trim();
@@ -212,16 +212,30 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         return;
       }
 
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      if (useDefaultBrowser) {
+        // Attempt to launch in the default browser
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          _showSnackBar('Cannot open link in default browser');
+        }
       } else {
-        _showSnackBar('Cannot open link');
+        // Use platformDefault for in-app browser
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.platformDefault);
+        } else {
+          // Fallback to external browser if in-app browser fails
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            _showSnackBar('Cannot open link');
+          }
+        }
       }
     } catch (e) {
       _showSnackBar('Error opening URL: $e');
     }
   }
-
   void _copyUrl(String url) {
     Clipboard.setData(ClipboardData(text: url));
     _showSnackBar('URL copied to clipboard');
@@ -355,10 +369,18 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               ),
               ListTile(
                 leading: Icon(Icons.open_in_new, color: Theme.of(context).colorScheme.onSurface),
-                title: const Text('Open Link'),
+                title: const Text('Open Link (In-App)'),
                 onTap: () {
                   Navigator.pop(context);
-                  _openLink(link.url);
+                  _openLink(link.url, useDefaultBrowser: false);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.open_in_browser, color: Theme.of(context).colorScheme.onSurface),
+                title: const Text('Open in Default Browser'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openLink(link.url, useDefaultBrowser: true);
                 },
               ),
               ListTile(
@@ -410,7 +432,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           if (_isSelectionMode) {
             _toggleLinkSelection(link);
           } else {
-            _openLink(link.url);
+            _openLink(link.url, useDefaultBrowser: true);
           }
         },
         onLongPress: () {
@@ -594,7 +616,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             if (_isSelectionMode) {
               _toggleLinkSelection(link);
             } else {
-              _openLink(link.url);
+              _openLink(link.url, useDefaultBrowser: true);
             }
           },
           onLongPress: () {
