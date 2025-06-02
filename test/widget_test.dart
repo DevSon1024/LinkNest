@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:link_saver/main.dart';
-import 'package:link_saver/screens/links_page.dart';
+import 'package:link_saver/pages/links_page.dart';
 void main() {
   setUp(() async {
     // Mock SharedPreferences for testing
