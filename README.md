@@ -6,8 +6,8 @@
 
 ### Smart Link Saver for Android
 
-[![GitHub release](https://img.shields.io/github/v/release/DevSon1024e/LinkNest?label=Release&logo=github)](https://github.com/DevSon1024/LinkNest/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/DevSon1024e/LinkNest/total?logo=github)](https://github.com/DevSon1024/LinkNest/releases)
+[![GitHub release](https://img.shields.io/github/v/release/DevSon1024/LinkNest?label=Release&logo=github)](https://github.com/DevSon1024/LinkNest/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/DevSon1024/LinkNest/total?logo=github)](https://github.com/DevSon1024/LinkNest/releases)
 [![Changelog](https://img.shields.io/badge/Changelog-Available-blue)](https://github.com/DevSon1024/LinkNest/blob/main/CHANGELOG.md)
 [![License: MIT](https://img.shields.io/github/license/Devson1024/LinkNest)](LICENSE)
 
