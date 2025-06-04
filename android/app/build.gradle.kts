@@ -62,8 +62,8 @@ android {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") // Desugaring for Java 8+ features
-    implementation("androidx.multidex:multidex:2.0.1") // MultiDex support
-    // Other dependencies (Flutter may add some automatically)
+    implementation("androidx.multidex:multidex:2.0.1")// MultiDex support
+    implementation("androidx.core:core-ktx:1.16.0")
 }
 
 flutter {

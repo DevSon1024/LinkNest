@@ -31,7 +31,6 @@ dependencies:
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
   flutter_cache_manager: ^3.4.1
-  uri: ^1.0.0
   flutter_local_notifications: ^17.2.3
 
 dev_dependencies:
