@@ -431,7 +431,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha((0.2 * 255).toInt()),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -575,7 +575,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
+                color: Theme.of(context).colorScheme.shadow.withAlpha((0.08 * 255).toInt()),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -702,7 +702,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        color: Theme.of(context).colorScheme.onSurface.withAlpha((0.6 * 255).toInt()),
                       ),
                       child: Icon(
                         Icons.more_vert,
@@ -905,7 +905,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               icon: Icon(
                 Icons.refresh,
                 color: _isRefreshing
-                    ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                    ? Theme.of(context).colorScheme.onSurface.withAlpha((0.5 * 255).toInt())
                     : Theme.of(context).colorScheme.onSurface,
               ),
               onPressed: _isRefreshing ? null : _refreshAllLinksMetadata,
