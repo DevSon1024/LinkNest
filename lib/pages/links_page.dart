@@ -7,6 +7,7 @@ import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/metadata_service.dart';
 
 class LinksPage extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -792,6 +793,23 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         elevation: 2,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              setState(() => _isLoading = true);
+              try {
+                // Clear cache first
+                await MetadataService.clearCache();
+                // Reload links to force metadata refresh
+                await loadLinks();
+              } catch (e) {
+                _showSnackBar('Error refreshing: $e');
+              } finally {
+                setState(() => _isLoading = false);
+              }
+            },
+            tooltip: 'Refresh metadata',
+          ),
           IconButton(
             icon: Icon(
               _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,

@@ -1,3 +1,5 @@
+// this is sub folder page of all links like instagram, yt etc.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
+import '../services/metadata_service.dart';
 
 class FolderLinksPage extends StatefulWidget {
   final String folderName;
@@ -779,7 +782,38 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         elevation: 2,
+        // In the AppBar actions section, replace the existing actions with:
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              setState(() {});
+              try {
+                // Clear cache first
+                await MetadataService.clearCache();
+                // Force metadata refresh by updating links
+                for (var link in widget.links) {
+                  final updatedMetadata = await MetadataService.extractMetadata(link.url);
+                  if (updatedMetadata != null) {
+                    final updatedLink = link.copyWith(
+                      title: updatedMetadata.title,
+                      description: updatedMetadata.description,
+                      imageUrl: updatedMetadata.imageUrl,
+                      domain: updatedMetadata.domain,
+                      // Preserve existing notes
+                      notes: link.notes,
+                    );
+                    await _dbHelper.updateLink(updatedLink);
+                  }
+                }
+                // Refresh the list
+                setState(() {});
+              } catch (e) {
+                _showSnackBar('Error refreshing: $e');
+              }
+            },
+            tooltip: 'Refresh metadata',
+          ),
           IconButton(
             icon: Icon(
               _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,

@@ -1,3 +1,5 @@
+// it is Link Folders page
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import 'folder_links_page.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
+import '../services/metadata_service.dart';
 
 class LinksFoldersPage extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -676,7 +679,39 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         elevation: 2,
+        // In the AppBar actions section, replace the existing actions with:
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              setState(() {});
+              try {
+                // Clear cache first
+                await MetadataService.clearCache();
+                // Force metadata refresh by updating links
+                for (var folder in _folders.values) {
+                  for (var link in folder) {
+                    final updatedMetadata = await MetadataService.extractMetadata(link.url);
+                    if (updatedMetadata != null) {
+                      final updatedLink = link.copyWith(
+                        title: updatedMetadata.title,
+                        description: updatedMetadata.description,
+                        imageUrl: updatedMetadata.imageUrl,
+                        domain: updatedMetadata.domain,
+                        notes: link.notes,
+                      );
+                      await _dbHelper.updateLink(updatedLink);
+                    }
+                  }
+                }
+                // Refresh the list
+                setState(() {});
+              } catch (e) {
+                _showSnackBar('Error refreshing: $e');
+              }
+            },
+            tooltip: 'Refresh metadata',
+          ),
           IconButton(
             icon: Icon(
               _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,

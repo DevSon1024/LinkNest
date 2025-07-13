@@ -57,6 +57,7 @@ class InputPageState extends State<InputPage> {
     }
 
     setState(() => _isLoading = true);
+    await _dbHelper.database; // Ensure database is initialized
     try {
       final linkModel = await MetadataService.extractMetadata(url);
       if (linkModel != null) {
@@ -72,6 +73,14 @@ class InputPageState extends State<InputPage> {
       _showSnackBar('Error saving link: $e');
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pasteUrl() async {
+    final clipboardData = await Clipboard.getData('text/plain');
+    if (clipboardData != null && clipboardData.text != null) {
+      _urlController.text = clipboardData.text!.trim();
+      setState(() {});
     }
   }
 
@@ -154,7 +163,6 @@ class InputPageState extends State<InputPage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Input Section
           Container(
             padding: const EdgeInsets.all(16.0),
             decoration: BoxDecoration(
@@ -178,15 +186,24 @@ class InputPageState extends State<InputPage> {
                     ),
                     labelText: 'URL',
                     prefixIcon: const Icon(Icons.link_rounded),
-                    suffixIcon: _urlController.text.isNotEmpty
-                        ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _urlController.clear();
-                        setState(() {});
-                      },
-                    )
-                        : null,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.paste),
+                          onPressed: _pasteUrl,
+                          tooltip: 'Paste URL',
+                        ),
+                        if (_urlController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _urlController.clear();
+                              setState(() {});
+                            },
+                          ),
+                      ],
+                    ),
                   ),
                   keyboardType: TextInputType.url,
                   onSubmitted: (_) => _addLink(),
@@ -228,8 +245,6 @@ class InputPageState extends State<InputPage> {
               ],
             ),
           ),
-
-          // Recent URLs Section
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
@@ -239,8 +254,6 @@ class InputPageState extends State<InputPage> {
               ),
             ),
           ),
-
-          // Recent URLs List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
