@@ -18,7 +18,6 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), 'links.db');
-
     return await openDatabase(
       path,
       version: _databaseVersion,
@@ -41,7 +40,7 @@ class DatabaseHelper {
       notes TEXT,
       orderIndex INTEGER
     )
-  ''');
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -54,9 +53,21 @@ class DatabaseHelper {
     }
   }
 
+  String _normalizeUrl(String url) {
+    try {
+      final uri = Uri.parse(url.trim());
+      final scheme = uri.scheme.toLowerCase() == 'http' ? 'https' : uri.scheme;
+      final path = uri.path.endsWith('/') ? uri.path.substring(0, uri.path.length - 1) : uri.path;
+      return Uri(scheme: scheme, host: uri.host.toLowerCase(), path: path, query: uri.query).toString();
+    } catch (e) {
+      return url.trim().toLowerCase();
+    }
+  }
+
   Future<int> insertLink(LinkModel link) async {
     final db = await database;
-    return await db.insert('links', link.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    final normalizedUrl = _normalizeUrl(link.url);
+    return await db.insert('links', link.toMap()..['url'] = normalizedUrl, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<LinkModel>> getAllLinks() async {
@@ -65,18 +76,17 @@ class DatabaseHelper {
       'links',
       orderBy: 'orderIndex ASC, createdAt DESC',
     );
-    return List.generate(maps.length, (i) {
-      return LinkModel.fromMap(maps[i]);
-    });
+    return List.generate(maps.length, (i) => LinkModel.fromMap(maps[i]));
   }
 
   Future<int> updateLink(LinkModel link) async {
     final db = await database;
+    final normalizedUrl = _normalizeUrl(link.url);
     return await db.update(
       'links',
-      link.toMap(),
-      where: 'id = ?',
-      whereArgs: [link.id],
+      link.toMap()..['url'] = normalizedUrl,
+      where: 'url = ?',
+      whereArgs: [normalizedUrl],
     );
   }
 
@@ -91,10 +101,11 @@ class DatabaseHelper {
 
   Future<bool> linkExists(String url) async {
     final db = await database;
+    final normalizedUrl = _normalizeUrl(url);
     final List<Map<String, dynamic>> maps = await db.query(
       'links',
       where: 'url = ?',
-      whereArgs: [url],
+      whereArgs: [normalizedUrl],
       limit: 1,
     );
     return maps.isNotEmpty;

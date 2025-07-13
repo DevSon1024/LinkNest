@@ -5,7 +5,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,7 +24,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   bool _isGridView = false;
   bool _isLoading = false;
   bool _isSelectionMode = false;
-  bool _isRefreshing = false;
   late AnimationController _fabAnimationController;
   final ScrollController _scrollController = ScrollController();
 
@@ -59,76 +57,16 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     await prefs.setBool('links_page_view', _isGridView);
   }
 
-  Future<void> loadLinks({bool forceRefresh = false}) async {
-    if (_isLoading && !forceRefresh) return;
+  Future<void> loadLinks() async {
     setState(() => _isLoading = true);
     try {
       final links = await _dbHelper.getAllLinks();
       print('Loaded links: ${links.map((link) => link.url).toList()}');
       setState(() => _links = links);
-      if (forceRefresh) {
-        widget.onRefresh?.call();
-      }
     } catch (e) {
       _showSnackBar('Error loading links: $e');
     } finally {
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _refreshAllLinksMetadata() async {
-    if (_isRefreshing) return;
-
-    setState(() => _isRefreshing = true);
-
-    try {
-      _showSnackBar('Refreshing links metadata...');
-
-      List<LinkModel> updatedLinks = [];
-
-      for (int i = 0; i < _links.length; i++) {
-        final link = _links[i];
-
-        try {
-          final updatedMetadata = await MetadataService.extractMetadata(link.url);
-
-          if (updatedMetadata != null) {
-            final updatedLink = link.copyWith(
-              title: updatedMetadata.title.isNotEmpty ? updatedMetadata.title : link.title,
-              description: updatedMetadata.description.isNotEmpty ? updatedMetadata.description : link.description,
-              imageUrl: updatedMetadata.imageUrl.isNotEmpty ? updatedMetadata.imageUrl : link.imageUrl,
-              domain: updatedMetadata.domain.isNotEmpty ? updatedMetadata.domain : link.domain,
-            );
-
-            await _dbHelper.updateLink(updatedLink);
-            updatedLinks.add(updatedLink);
-          } else {
-            updatedLinks.add(link);
-          }
-        } catch (e) {
-          print('Error refreshing metadata for ${link.url}: $e');
-          updatedLinks.add(link);
-        }
-
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      setState(() => _links = updatedLinks);
-      _showSnackBar('Links metadata refreshed successfully!');
-      widget.onRefresh?.call();
-    } catch (e) {
-      _showSnackBar('Error refreshing links: $e');
-    } finally {
-      setState(() => _isRefreshing = false);
-    }
-  }
-
-  String _getFaviconUrl(String url) {
-    try {
-      final uri = Uri.parse(url);
-      return 'https://www.google.com/s2/favicons?domain=${uri.host}&sz=64';
-    } catch (e) {
-      return 'https://www.google.com/s2/favicons?domain=example.com&sz=64';
     }
   }
 
@@ -144,14 +82,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     } else {
       _fabAnimationController.reverse();
     }
-  }
-
-  void _deselectAllLinks() {
-    setState(() {
-      _selectedLinks.clear();
-      _isSelectionMode = false;
-    });
-    _fabAnimationController.reverse();
   }
 
   Future<void> _shareSelectedLinks() async {
@@ -216,7 +146,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       }
       _selectedLinks.clear();
       _toggleSelectionMode();
-      await loadLinks(forceRefresh: true);
+      await loadLinks();
       _showSnackBar('Links deleted successfully');
     }
   }
@@ -248,7 +178,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     if (confirm == true && link.id != null) {
       final deletedLink = link;
       await _dbHelper.deleteLink(link.id!);
-      await loadLinks(forceRefresh: true);
+      await loadLinks();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Link deleted'),
@@ -260,7 +190,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             textColor: Colors.blue,
             onPressed: () async {
               await _dbHelper.insertLink(deletedLink);
-              await loadLinks(forceRefresh: true);
+              await loadLinks();
             },
           ),
         ),
@@ -283,15 +213,18 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       }
 
       if (useDefaultBrowser) {
+        // Attempt to launch in the default browser
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
           _showSnackBar('Cannot open link in default browser');
         }
       } else {
+        // Use platformDefault for in-app browser
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.platformDefault);
         } else {
+          // Fallback to external browser if in-app browser fails
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else {
@@ -303,7 +236,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       _showSnackBar('Error opening URL: $e');
     }
   }
-
   void _copyUrl(String url) {
     Clipboard.setData(ClipboardData(text: url));
     _showSnackBar('URL copied to clipboard');
@@ -402,7 +334,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             onPressed: () async {
               final updatedLink = link.copyWith(notes: notesController.text.isEmpty ? null : notesController.text);
               await _dbHelper.updateLink(updatedLink);
-              await loadLinks(forceRefresh: true);
+              await loadLinks();
               Navigator.pop(context);
               _showSnackBar('Notes saved');
             },
@@ -431,7 +363,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha((0.2 * 255).toInt()),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -491,65 +423,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildLinkImage(LinkModel link, {double? width, double? height, BoxFit? fit}) {
-    final faviconUrl = _getFaviconUrl(link.url);
-
-    if (link.imageUrl.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: link.imageUrl,
-        width: width,
-        height: height,
-        fit: fit ?? BoxFit.cover,
-        placeholder: (context, url) => Shimmer.fromColors(
-          baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          highlightColor: Theme.of(context).colorScheme.surfaceContainer,
-          child: Container(
-            width: width,
-            height: height,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          ),
-        ),
-        errorWidget: (context, url, error) => CachedNetworkImage(
-          imageUrl: faviconUrl,
-          width: width,
-          height: height,
-          fit: BoxFit.contain,
-          placeholder: (context, url) => Container(
-            width: width,
-            height: height,
-            color: Theme.of(context).colorScheme.surfaceContainer,
-            child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          errorWidget: (context, url, error) => Container(
-            width: width,
-            height: height,
-            color: Theme.of(context).colorScheme.surfaceContainer,
-            child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-        ),
-      );
-    } else {
-      return CachedNetworkImage(
-        imageUrl: faviconUrl,
-        width: width,
-        height: height,
-        fit: BoxFit.contain,
-        placeholder: (context, url) => Container(
-          width: width,
-          height: height,
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-        errorWidget: (context, url, error) => Container(
-          width: width,
-          height: height,
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        ),
-      );
-    }
-  }
-
   Widget _buildLinkCard(LinkModel link) {
     final isSelected = _selectedLinks.contains(link);
 
@@ -575,7 +448,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).colorScheme.shadow.withAlpha((0.08 * 255).toInt()),
+                color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -599,7 +472,22 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                         flex: 3,
                         child: Container(
                           color: Theme.of(context).colorScheme.surfaceContainer,
-                          child: _buildLinkImage(link),
+                          child: link.imageUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                            imageUrl: link.imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Shimmer.fromColors(
+                              baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              highlightColor: Theme.of(context).colorScheme.surfaceContainer,
+                              child: Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                            ),
+                            errorWidget: (context, url, error) => Center(
+                              child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                          )
+                              : Center(
+                            child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
                         ),
                       ),
                       Container(
@@ -609,7 +497,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              link.title.isNotEmpty ? link.title : link.domain,
+                              link.title,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
@@ -702,7 +590,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.onSurface.withAlpha((0.6 * 255).toInt()),
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                       ),
                       child: Icon(
                         Icons.more_vert,
@@ -741,12 +629,25 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: _buildLinkImage(link, width: 48, height: 48),
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                  child: link.imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                    imageUrl: link.imageUrl,
+                    placeholder: (context, url) => Icon(
+                      Icons.link,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    errorWidget: (context, url, error) => Icon(
+                      Icons.link,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    fit: BoxFit.cover,
+                  )
+                      : Icon(
+                    Icons.link,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -756,7 +657,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        link.title.isNotEmpty ? link.title : link.domain,
+                        link.title,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -863,7 +764,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: () => loadLinks(forceRefresh: true),
+            onPressed: loadLinks,
             icon: const Icon(Icons.refresh),
             label: const Text('Refresh'),
             style: ElevatedButton.styleFrom(
@@ -891,40 +792,19 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         elevation: 2,
         actions: [
-          if (_isSelectionMode)
-            IconButton(
-              icon: Icon(
-                Icons.clear,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: _deselectAllLinks,
-              tooltip: 'Deselect All',
-            )
-          else ...[
-            IconButton(
-              icon: Icon(
-                Icons.refresh,
-                color: _isRefreshing
-                    ? Theme.of(context).colorScheme.onSurface.withAlpha((0.5 * 255).toInt())
-                    : Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: _isRefreshing ? null : _refreshAllLinksMetadata,
-              tooltip: 'Refresh Metadata',
+          IconButton(
+            icon: Icon(
+              _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
-            IconButton(
-              icon: Icon(
-                _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: () {
-                setState(() {
-                  _isGridView = !_isGridView;
-                  _saveViewPreference();
-                });
-              },
-              tooltip: _isGridView ? 'List view' : 'Grid view',
-            ),
-          ],
+            onPressed: () {
+              setState(() {
+                _isGridView = !_isGridView;
+                _saveViewPreference();
+              });
+            },
+            tooltip: _isGridView ? 'List view' : 'Grid view',
+          ),
         ],
       ),
       body: _isLoading
@@ -932,7 +812,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           : _links.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-        onRefresh: _refreshAllLinksMetadata,
+        onRefresh: loadLinks,
         child: _isGridView
             ? GridView.builder(
           controller: _scrollController,
@@ -955,7 +835,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
-        padding: const EdgeInsets.only(bottom: 80.0),
+        padding: const EdgeInsets.only(bottom: 80.0), // Adjusted to be above the bottom navigation bar
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [

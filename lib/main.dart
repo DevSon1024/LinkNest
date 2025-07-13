@@ -8,8 +8,9 @@ import 'pages/input_page.dart';
 import 'screens/menu_page.dart';
 import 'screens/theme_notifier.dart';
 import 'dart:async';
+import 'services/metadata_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const LinkNestApp());
 }
@@ -30,12 +31,21 @@ class LinkNestApp extends StatelessWidget {
             themeMode: themeNotifier.themeMode,
             home: const MainScreen(),
             debugShowCheckedModeBanner: false,
+            navigatorKey: _navigatorKey,
+            routes: {
+              '/links': (context) => LinksPage(
+                key: GlobalKey<LinksPageState>(),
+                onRefresh: () => (context as Element).findAncestorStateOfType<_MainScreenState>()?.refreshLinks(),
+              ),
+            },
           );
         },
       ),
     );
   }
 }
+
+final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -73,24 +83,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    print('App lifecycle state changed: $state');
-
-    if (state == AppLifecycleState.resumed) {
-      print('App resumed, checking for shared data...');
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted && !_isProcessingSharedLink) {
-          _checkForInitialSharedMedia();
-        }
-      });
-    }
-  }
-
   void _setupSharingIntent() {
     print('Setting up sharing intent subscription for media...');
-
     _intentMediaSub = ReceiveSharingIntent.instance.getMediaStream().listen(
           (List<SharedMediaFile> files) {
         print('Received shared media: ${files.map((f) => f.toMap())}');
@@ -100,15 +94,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       },
       onError: (err) {
         print("getMediaStream error: $err");
-        _isProcessingSharedLink = false;
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error processing shared media: $err'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
       },
     );
 
@@ -117,23 +102,29 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   void _checkForInitialSharedMedia() {
+    print('Checking for initial shared media...');
     ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile>? files) {
       if (files != null && files.isNotEmpty) {
         print('Initial shared media received: ${files.map((f) => f.toMap())}');
         _processSharedMedia(files);
         ReceiveSharingIntent.instance.reset();
+      } else {
+        print('No initial shared media found');
       }
     }).catchError((error) {
       print('Error getting initial media: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing shared media: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     });
+  }
+
+  String _normalizeUrl(String url) {
+    try {
+      final uri = Uri.parse(url.trim());
+      final scheme = uri.scheme.toLowerCase() == 'http' ? 'https' : uri.scheme;
+      final path = uri.path.endsWith('/') ? uri.path.substring(0, uri.path.length - 1) : uri.path;
+      return Uri(scheme: scheme, host: uri.host.toLowerCase(), path: path, query: uri.query).toString();
+    } catch (e) {
+      return url.trim().toLowerCase();
+    }
   }
 
   Future<void> _processSharedMedia(List<SharedMediaFile> files) async {
@@ -148,12 +139,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     try {
       for (final file in files) {
         final url = file.path;
-        if (url.isEmpty) {
-          print('No valid URL found in media: ${file.toMap()}');
+        if (url.isEmpty || !MetadataService.isValidUrl(url)) {
+          print('Invalid URL found in media: ${file.toMap()}');
           continue;
         }
 
-        final linkKey = url.trim().toLowerCase();
+        final normalizedUrl = _normalizeUrl(url);
+        final linkKey = normalizedUrl;
         if (_processedLinks.contains(linkKey)) {
           print('Duplicate media detected, skipping: $linkKey');
           continue;
@@ -161,69 +153,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
         _processedLinks.add(linkKey);
 
-        if (_selectedIndex != 0) {
-          setState(() {
-            _selectedIndex = 0;
-            _pageController.jumpToPage(0);
-          });
-          await Future.delayed(const Duration(milliseconds: 300));
-        }
-
         final success = await _homeScreenKey.currentState?.addLinkFromUrl(url);
 
         if (success == true) {
           print('Link saved successfully: $url');
-          setState(() {
-            _selectedIndex = 1;
-            _pageController.jumpToPage(1);
-          });
-
-          await Future.delayed(const Duration(milliseconds: 300));
           if (mounted) {
             _linksPageKey.currentState?.loadLinks();
             _foldersPageKey.currentState?.loadFolders();
           }
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Link saved successfully!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
         } else {
           print('Failed to save link or link already exists: $url');
-          if (mounted) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Link already exists or failed to save: $url'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
         }
 
-        Timer(const Duration(milliseconds: 2000), () {
+        Timer(const Duration(seconds: 5), () {
           _processedLinks.remove(linkKey);
         });
       }
     } catch (e) {
       print('Error processing shared media: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing shared media: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } finally {
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      Future.delayed(const Duration(seconds: 1), () {
         _isProcessingSharedLink = false;
       });
     }
@@ -243,6 +192,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       _pageController.jumpToPage(index);
       FocusScope.of(context).unfocus();
     });
+  }
+
+  void refreshLinks() {
+    _linksPageKey.currentState?.loadLinks();
+    _foldersPageKey.currentState?.loadFolders();
   }
 
   Widget _buildNavItem(int index, IconData filledIcon, IconData outlinedIcon, String label) {

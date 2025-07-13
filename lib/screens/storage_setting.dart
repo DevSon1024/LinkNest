@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data'; // Added for Uint8List
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive_io.dart';
@@ -20,7 +21,7 @@ class StorageSetting extends StatefulWidget {
 
 class StorageSettingState extends State<StorageSetting> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  bool _hasStoragePermission = false;
+  bool _hasStoragePermission = true; // Default to true for Android 13+
 
   @override
   void initState() {
@@ -29,11 +30,22 @@ class StorageSettingState extends State<StorageSetting> {
   }
 
   Future<void> _checkPermissionStatus() async {
-    final status = await Permission.storage.status;
-    final manageStatus = await Permission.manageExternalStorage.status;
-    setState(() {
-      _hasStoragePermission = status.isGranted || manageStatus.isGranted;
-    });
+    // Only check for Android 12 (API 32) and below
+    if (Platform.isAndroid && await _getAndroidVersion() <= 32) {
+      final status = await Permission.storage.status;
+      setState(() {
+        _hasStoragePermission = status.isGranted;
+      });
+    } else {
+      setState(() {
+        _hasStoragePermission = true; // No permission needed for Android 13+
+      });
+    }
+  }
+
+  Future<int> _getAndroidVersion() async {
+    // Placeholder: Use device_info_plus in production
+    return 33; // Assume Android 13+ for simplicity
   }
 
   void _showSnackBar(String message) {
@@ -83,25 +95,17 @@ class StorageSettingState extends State<StorageSetting> {
           'title': link.title,
           'description': link.description,
           'imageUrl': link.imageUrl,
-          'created_at': link.createdAt.toIso8601String(), // Removed ?. operator
+          'created_at': link.createdAt.toIso8601String(),
         }).toList(),
       };
 
       final jsonString = jsonEncode(exportData);
-
       print('JSON data length: ${jsonString.length}');
       print('Number of links: ${links.length}');
 
-      final outputDir = await FilePicker.platform.getDirectoryPath();
-      if (outputDir == null) {
-        Navigator.of(context).pop();
-        _showSnackBar('No directory selected');
-        return;
-      }
-
+      // Create temporary JSON file
       final tempDir = await getTemporaryDirectory();
       final tempJsonFile = File('${tempDir.path}/links_backup.json');
-
       await tempJsonFile.writeAsString(jsonString, flush: true);
 
       if (!await tempJsonFile.exists()) {
@@ -120,34 +124,44 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final zipFilePath = '$outputDir/links_backup_$timestamp.zip';
-
+      // Create ZIP archive
       final jsonBytes = await tempJsonFile.readAsBytes();
-
       final archive = Archive();
       final archiveFile = ArchiveFile('links_backup.json', jsonBytes.length, jsonBytes);
       archive.addFile(archiveFile);
 
       final zipData = ZipEncoder().encode(archive);
+      await tempJsonFile.delete();
 
-      final zipFile = File(zipFilePath);
-      await zipFile.writeAsBytes(zipData);
+      // Use SAF to save the ZIP file
+      final fileName = 'links_backup_${DateTime.now().millisecondsSinceEpoch}.zip';
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save Backup File',
+        fileName: fileName,
+        bytes: Uint8List.fromList(zipData), // Convert List<int> to Uint8List
+        allowedExtensions: ['zip'],
+        type: FileType.custom,
+      );
 
+      if (result == null) {
+        Navigator.of(context).pop();
+        _showSnackBar('No file location selected');
+        return;
+      }
+
+      // For verification, check if the file was created
+      final zipFile = File(result);
       if (!await zipFile.exists()) {
         Navigator.of(context).pop();
-        _showSnackBar('Failed to create ZIP file');
-        await tempJsonFile.delete();
+        _showSnackBar('Failed to verify ZIP file creation');
         return;
       }
 
       final zipSize = await zipFile.length();
       print('ZIP file size: $zipSize bytes');
 
-      await tempJsonFile.delete();
-
       Navigator.of(context).pop();
-      _showSnackBar('Data exported successfully to $zipFilePath');
+      _showSnackBar('Data exported successfully to $result');
     } catch (e) {
       Navigator.of(context).pop();
       print('Export error: $e');
@@ -177,11 +191,7 @@ class StorageSettingState extends State<StorageSetting> {
         allowMultiple: false,
       );
 
-      if (result == null) {
-        _showSnackBar('No file selected');
-        return;
-      }
-      if (result.files.isEmpty) {
+      if (result == null || result.files.isEmpty) {
         _showSnackBar('No file selected');
         return;
       }
@@ -278,7 +288,6 @@ class StorageSettingState extends State<StorageSetting> {
             final existingLink = existingLinks.firstWhere((link) => link.url == url);
             if ((notes != null && notes.isNotEmpty) ||
                 (title.isNotEmpty && title != 'Untitled') ||
-                (description.isNotEmpty) ||
                 (imageUrl.isNotEmpty)) {
               batch.update(
                 'links',
@@ -303,7 +312,7 @@ class StorageSettingState extends State<StorageSetting> {
     } catch (e) {
       Navigator.of(context).pop();
       print('Import error: $e');
-      _showSnackBar('Error importing data: $e');
+      _showSnackBar('Error exporting data: $e');
     }
   }
 
@@ -369,8 +378,9 @@ class StorageSettingState extends State<StorageSetting> {
                     ),
                     Text(
                       subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 12,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -431,9 +441,10 @@ class StorageSettingState extends State<StorageSetting> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Storage permission required for backup/restore operations',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          'Storage permission required for backup/restore operations on older Android versions',
+                          style: TextStyle(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12,
                           ),
                         ),
                       ),

@@ -2,6 +2,7 @@ import 'package:metadata_fetch/metadata_fetch.dart';
 import '../models/link_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class MetadataService {
   static final Map<String, LinkModel> _cache = {};
@@ -30,15 +31,37 @@ class MetadataService {
 
     try {
       final uri = Uri.parse(url);
+      String domain = uri.host.replaceFirst('www.', '');
+      String title = 'Untitled';
+      String description = 'No description available';
+      String imageUrl = '';
+
+      // Attempt to fetch metadata using metadata_fetch
       final metadata = await MetadataFetch.extract(url);
+      if (metadata != null) {
+        title = metadata.title?.trim() ?? 'Untitled';
+        description = metadata.description?.trim() ?? 'No description available';
+        imageUrl = metadata.image?.trim() ?? '';
+      }
 
-      String domain = uri.host;
-      String title = metadata?.title ?? 'Untitled';
-      String description = metadata?.description ?? '';
-      String imageUrl = metadata?.image ?? '';
+      // Fallback: Fetch page and extract title if metadata is incomplete
+      if (title == 'Untitled' || title.isEmpty) {
+        try {
+          final response = await http.get(uri);
+          if (response.statusCode == 200) {
+            final html = response.body;
+            final titleMatch = RegExp(r'<title[^>]*>(.*?)</title>', caseSensitive: false).firstMatch(html);
+            if (titleMatch != null && titleMatch.group(1)!.isNotEmpty) {
+              title = titleMatch.group(1)!.trim();
+            }
+          }
+        } catch (e) {
+          print('Fallback title extraction failed: $e');
+        }
+      }
 
-      if (title.isEmpty) title = 'Untitled';
-      if (description.isEmpty) description = 'No description available';
+      // Ensure title is not empty
+      if (title.isEmpty) title = domain;
 
       final linkModel = LinkModel(
         url: url,
@@ -60,11 +83,11 @@ class MetadataService {
       if (uri != null) {
         final linkModel = LinkModel(
           url: url,
-          title: uri.host,
+          title: uri.host.replaceFirst('www.', ''),
           description: 'Unable to load preview',
           imageUrl: '',
           createdAt: DateTime.now(),
-          domain: uri.host,
+          domain: uri.host.replaceFirst('www.', ''),
           tags: [],
           notes: null,
         );
@@ -74,6 +97,12 @@ class MetadataService {
       }
       return null;
     }
+  }
+
+  static Future<void> clearCache() async {
+    _cache.clear();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
   }
 
   static bool isValidUrl(String url) {
