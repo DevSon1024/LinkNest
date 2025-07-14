@@ -9,6 +9,7 @@ import 'screens/menu_page.dart';
 import 'screens/theme_notifier.dart';
 import 'dart:async';
 import 'services/metadata_service.dart';
+import 'services/database_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,9 +64,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   final GlobalKey<LinksFoldersPageState> _foldersPageKey = GlobalKey<LinksFoldersPageState>();
 
   late StreamSubscription _intentMediaSub;
-  bool _isProcessingSharedLink = false;
-  final Set<String> _processedLinks = <String>{};
-  Timer? _cleanupTimer;
 
   @override
   void initState() {
@@ -79,7 +77,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _intentMediaSub.cancel();
     _pageController.dispose();
-    _cleanupTimer?.cancel();
     super.dispose();
   }
 
@@ -98,7 +95,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
 
     _checkForInitialSharedMedia();
-    _setupMobile();
   }
 
   void _checkForInitialSharedMedia() {
@@ -128,62 +124,32 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _processSharedMedia(List<SharedMediaFile> files) async {
-    if (_isProcessingSharedLink) {
-      print('Already processing shared media, skipping: ${files.map((f) => f.toMap())}');
-      return;
-    }
-
-    _isProcessingSharedLink = true;
-    print('Processing shared media: ${files.map((f) => f.toMap())}');
-
-    try {
-      for (final file in files) {
-        final url = file.path;
-        if (url.isEmpty || !MetadataService.isValidUrl(url)) {
-          print('Invalid URL found in media: ${file.toMap()}');
-          continue;
-        }
-
-        final normalizedUrl = _normalizeUrl(url);
-        final linkKey = normalizedUrl;
-        if (_processedLinks.contains(linkKey)) {
-          print('Duplicate media detected, skipping: $linkKey');
-          continue;
-        }
-
-        _processedLinks.add(linkKey);
-
-        final success = await _homeScreenKey.currentState?.addLinkFromUrl(url);
-
-        if (success == true) {
-          print('Link saved successfully: $url');
-          if (mounted) {
-            _linksPageKey.currentState?.loadLinks();
-            _foldersPageKey.currentState?.loadFolders();
-          }
-        } else {
-          print('Failed to save link or link already exists: $url');
-        }
-
-        Timer(const Duration(seconds: 5), () {
-          _processedLinks.remove(linkKey);
-        });
+    for (final file in files) {
+      final url = file.path;
+      if (url.isEmpty || !MetadataService.isValidUrl(url)) {
+        print('Invalid URL found in media: ${file.toMap()}');
+        continue;
       }
-    } catch (e) {
-      print('Error processing shared media: $e');
-    } finally {
-      Future.delayed(const Duration(seconds: 1), () {
-        _isProcessingSharedLink = false;
-      });
-    }
-  }
 
-  void _setupMobile() {
-    _cleanupTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      final oldSize = _processedLinks.length;
-      _processedLinks.clear();
-      print('Periodic cleanup - cleared $oldSize processed links');
-    });
+      final normalizedUrl = _normalizeUrl(url);
+      final dbHelper = DatabaseHelper();
+      if (await dbHelper.linkExists(normalizedUrl)) {
+        print('Link already exists: $normalizedUrl');
+        continue;
+      }
+
+      final metadata = await MetadataService.extractMetadata(normalizedUrl);
+      if (metadata != null) {
+        await dbHelper.insertLink(metadata);
+        print('Link saved successfully: $normalizedUrl');
+        if (mounted) {
+          _linksPageKey.currentState?.loadLinks();
+          _foldersPageKey.currentState?.loadFolders();
+        }
+      } else {
+        print('Failed to extract metadata for: $normalizedUrl');
+      }
+    }
   }
 
   void _onNavItemTapped(int index) {
