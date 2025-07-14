@@ -1,10 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'storage_setting.dart';
 import 'version_page.dart';
 import 'display_setting.dart';
 
 class MenuPage extends StatelessWidget {
   const MenuPage({super.key});
+
+  Future<void> _launchPrivacyPolicy() async {
+    const url = 'https://sites.google.com/view/linknest-privacy-policy/home';
+    final uri = Uri.parse(url);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch $url';
+      }
+    } catch (e) {
+      print('Error launching URL: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +58,14 @@ class MenuPage extends StatelessWidget {
                 context,
                 MaterialPageRoute(builder: (context) => const StorageSetting()),
               ),
+            ),
+            const SizedBox(height: 16),
+            _buildMenuItem(
+              context,
+              icon: Icons.privacy_tip_rounded,
+              title: 'Privacy Policy',
+              subtitle: 'View app privacy policy and terms',
+              onTap: _launchPrivacyPolicy,
             ),
             const SizedBox(height: 16),
             _buildMenuItem(

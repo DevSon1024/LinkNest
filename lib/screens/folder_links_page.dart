@@ -11,6 +11,8 @@ import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
 
+enum SortOrder { latest, oldest }
+
 class FolderLinksPage extends StatefulWidget {
   final String folderName;
   final List<LinkModel> links;
@@ -32,6 +34,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
   bool _isSelectionMode = false;
   late AnimationController _fabAnimationController;
   final ScrollController _scrollController = ScrollController();
+  SortOrder _sortOrder = SortOrder.latest;
 
   @override
   void initState() {
@@ -41,6 +44,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       vsync: this,
     );
     _loadViewPreference();
+    _sortLinks();
   }
 
   @override
@@ -62,6 +66,14 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
     await prefs.setBool('folder_links_page_view', _isGridView);
   }
 
+  void _sortLinks() {
+    setState(() {
+      widget.links.sort((a, b) => _sortOrder == SortOrder.latest
+          ? b.createdAt.compareTo(a.createdAt)
+          : a.createdAt.compareTo(b.createdAt));
+    });
+  }
+
   void _toggleSelectionMode() {
     setState(() {
       _isSelectionMode = !_isSelectionMode;
@@ -74,6 +86,20 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
     } else {
       _fabAnimationController.reverse();
     }
+  }
+
+  void _selectAllLinks() {
+    setState(() {
+      if (_selectedLinks.length == widget.links.length) {
+        _selectedLinks.clear();
+      } else {
+        _selectedLinks.clear();
+        _selectedLinks.addAll(widget.links);
+        if (!_isSelectionMode) {
+          _toggleSelectionMode();
+        }
+      }
+    });
   }
 
   Future<void> _shareSelectedLinks() async {
@@ -187,7 +213,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
               await _dbHelper.insertLink(deletedLink);
               setState(() {
                 widget.links.add(deletedLink);
-                widget.links.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                _sortLinks();
               });
             },
           ),
@@ -211,18 +237,15 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       }
 
       if (useDefaultBrowser) {
-        // Attempt to launch in the default browser
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
           _showSnackBar('Cannot open link in default browser');
         }
       } else {
-        // Use platformDefault for in-app browser
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.platformDefault);
         } else {
-          // Fallback to external browser if in-app browser fails
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else {
@@ -338,6 +361,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                 if (index != -1) {
                   widget.links[index] = updatedLink;
                 }
+                _sortLinks();
               });
               Navigator.pop(context);
               _showSnackBar('Notes saved');
@@ -782,16 +806,12 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         elevation: 2,
-        // In the AppBar actions section, replace the existing actions with:
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
-              setState(() {});
               try {
-                // Clear cache first
                 await MetadataService.clearCache();
-                // Force metadata refresh by updating links
                 for (var link in widget.links) {
                   final updatedMetadata = await MetadataService.extractMetadata(link.url);
                   if (updatedMetadata != null) {
@@ -800,19 +820,55 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                       description: updatedMetadata.description,
                       imageUrl: updatedMetadata.imageUrl,
                       domain: updatedMetadata.domain,
-                      // Preserve existing notes
                       notes: link.notes,
                     );
                     await _dbHelper.updateLink(updatedLink);
+                    setState(() {
+                      final index = widget.links.indexWhere((l) => l.id == link.id);
+                      if (index != -1) {
+                        widget.links[index] = updatedLink;
+                      }
+                      _sortLinks();
+                    });
                   }
                 }
-                // Refresh the list
-                setState(() {});
               } catch (e) {
                 _showSnackBar('Error refreshing: $e');
               }
             },
             tooltip: 'Refresh metadata',
+          ),
+          if (_isSelectionMode)
+            IconButton(
+              icon: Icon(
+                _selectedLinks.length == widget.links.length ? Icons.deselect : Icons.select_all,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              onPressed: _selectAllLinks,
+              tooltip: _selectedLinks.length == widget.links.length ? 'Deselect all' : 'Select all',
+            ),
+          PopupMenuButton<SortOrder>(
+            icon: Icon(
+              Icons.sort,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            onSelected: (SortOrder order) {
+              setState(() {
+                _sortOrder = order;
+                _sortLinks();
+              });
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOrder>>[
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.latest,
+                child: Text('Sort by Latest'),
+              ),
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.oldest,
+                child: Text('Sort by Oldest'),
+              ),
+            ],
+            tooltip: 'Sort links',
           ),
           IconButton(
             icon: Icon(
@@ -833,7 +889,9 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
           ? _buildEmptyState()
           : RefreshIndicator(
         onRefresh: () async {
-          setState(() {});
+          setState(() {
+            _sortLinks();
+          });
         },
         child: _isGridView
             ? GridView.builder(
@@ -857,7 +915,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
-        padding: const EdgeInsets.only(bottom: 80.0), // Adjusted to be above the bottom navigation bar
+        padding: const EdgeInsets.only(bottom: 80.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [

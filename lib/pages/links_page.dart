@@ -9,6 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/metadata_service.dart';
 
+enum SortOrder { latest, oldest }
+
 class LinksPage extends StatefulWidget {
   final VoidCallback? onRefresh;
 
@@ -27,6 +29,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   bool _isSelectionMode = false;
   late AnimationController _fabAnimationController;
   final ScrollController _scrollController = ScrollController();
+  SortOrder _sortOrder = SortOrder.latest;
 
   @override
   void initState() {
@@ -62,13 +65,22 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     setState(() => _isLoading = true);
     try {
       final links = await _dbHelper.getAllLinks();
+      setState(() {
+        _links = links;
+        _sortLinks();
+      });
       print('Loaded links: ${links.map((link) => link.url).toList()}');
-      setState(() => _links = links);
     } catch (e) {
       _showSnackBar('Error loading links: $e');
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _sortLinks() {
+    _links.sort((a, b) => _sortOrder == SortOrder.latest
+        ? b.createdAt.compareTo(a.createdAt)
+        : a.createdAt.compareTo(b.createdAt));
   }
 
   void _toggleSelectionMode() {
@@ -83,6 +95,20 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     } else {
       _fabAnimationController.reverse();
     }
+  }
+
+  void _selectAllLinks() {
+    setState(() {
+      if (_selectedLinks.length == _links.length) {
+        _selectedLinks.clear();
+      } else {
+        _selectedLinks.clear();
+        _selectedLinks.addAll(_links);
+        if (!_isSelectionMode) {
+          _toggleSelectionMode();
+        }
+      }
+    });
   }
 
   Future<void> _shareSelectedLinks() async {
@@ -214,18 +240,15 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       }
 
       if (useDefaultBrowser) {
-        // Attempt to launch in the default browser
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
           _showSnackBar('Cannot open link in default browser');
         }
       } else {
-        // Use platformDefault for in-app browser
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.platformDefault);
         } else {
-          // Fallback to external browser if in-app browser fails
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else {
@@ -237,6 +260,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       _showSnackBar('Error opening URL: $e');
     }
   }
+
   void _copyUrl(String url) {
     Clipboard.setData(ClipboardData(text: url));
     _showSnackBar('URL copied to clipboard');
@@ -798,9 +822,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             onPressed: () async {
               setState(() => _isLoading = true);
               try {
-                // Clear cache first
                 await MetadataService.clearCache();
-                // Reload links to force metadata refresh
                 await loadLinks();
               } catch (e) {
                 _showSnackBar('Error refreshing: $e');
@@ -809,6 +831,38 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               }
             },
             tooltip: 'Refresh metadata',
+          ),
+          if (_isSelectionMode)
+            IconButton(
+              icon: Icon(
+                _selectedLinks.length == _links.length ? Icons.deselect : Icons.select_all,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              onPressed: _selectAllLinks,
+              tooltip: _selectedLinks.length == _links.length ? 'Deselect all' : 'Select all',
+            ),
+          PopupMenuButton<SortOrder>(
+            icon: Icon(
+              Icons.sort,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            onSelected: (SortOrder order) {
+              setState(() {
+                _sortOrder = order;
+                _sortLinks();
+              });
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOrder>>[
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.latest,
+                child: Text('Sort by Latest'),
+              ),
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.oldest,
+                child: Text('Sort by Oldest'),
+              ),
+            ],
+            tooltip: 'Sort links',
           ),
           IconButton(
             icon: Icon(
@@ -853,7 +907,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
-        padding: const EdgeInsets.only(bottom: 80.0), // Adjusted to be above the bottom navigation bar
+        padding: const EdgeInsets.only(bottom: 80.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
