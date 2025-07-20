@@ -1,3 +1,5 @@
+
+---
 # LinkNest v1.0.2 Release Notes
 *Released on May 28, 2025*
 
@@ -32,7 +34,7 @@ We’re always improving LinkNest based on your suggestions. Drop us your though
 *Released on May 24, 2025*
 
 Welcome to the initial release of **LinkNest**, your go-to app for saving, organizing, and managing links from across the web and other apps!
-
+---
 ## What's New in v1.0.0
 
 ### Core Features

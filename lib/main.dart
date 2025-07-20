@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'pages/home_screen.dart';
 import 'pages/links_page.dart';
-import 'screens/links_folders_page.dart';
+import 'pages/links_folders_page.dart';
 import 'pages/input_page.dart';
 import 'screens/menu_page.dart';
 import 'screens/theme_notifier.dart';
@@ -80,6 +80,25 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _showSnackBar(String message, {bool showViewAction = false}) {
+    final snackBar = SnackBar(
+      content: Text(message),
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      action: showViewAction
+          ? SnackBarAction(
+        label: 'View',
+        textColor: Colors.white,
+        onPressed: () {
+          _navigatorKey.currentState!.pushNamed('/links');
+        },
+      )
+          : null,
+    );
+    ScaffoldMessenger.of(_navigatorKey.currentState!.overlay!.context).showSnackBar(snackBar);
+  }
+
   void _setupSharingIntent() {
     print('Setting up sharing intent subscription for media...');
     _intentMediaSub = ReceiveSharingIntent.instance.getMediaStream().listen(
@@ -91,6 +110,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       },
       onError: (err) {
         print("getMediaStream error: $err");
+        _showSnackBar('Error processing shared link: $err');
       },
     );
 
@@ -109,6 +129,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       }
     }).catchError((error) {
       print('Error getting initial media: $error');
+      _showSnackBar('Error getting initial media: $error');
     });
   }
 
@@ -128,6 +149,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       final url = file.path;
       if (url.isEmpty || !MetadataService.isValidUrl(url)) {
         print('Invalid URL found in media: ${file.toMap()}');
+        _showSnackBar('Invalid URL: $url');
         continue;
       }
 
@@ -135,6 +157,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       final dbHelper = DatabaseHelper();
       if (await dbHelper.linkExists(normalizedUrl)) {
         print('Link already exists: $normalizedUrl');
+        _showSnackBar('Link already exists: $normalizedUrl');
         continue;
       }
 
@@ -142,12 +165,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (metadata != null) {
         await dbHelper.insertLink(metadata);
         print('Link saved successfully: $normalizedUrl');
+        _showSnackBar('Link saved successfully', showViewAction: true);
         if (mounted) {
           _linksPageKey.currentState?.loadLinks();
           _foldersPageKey.currentState?.loadFolders();
         }
       } else {
         print('Failed to extract metadata for: $normalizedUrl');
+        _showSnackBar('Failed to extract metadata for: $normalizedUrl');
       }
     }
   }

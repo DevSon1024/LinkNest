@@ -1,7 +1,8 @@
+// this is sub folder page of all links like instagram, yt etc.
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/link_model.dart';
@@ -11,25 +12,27 @@ import 'links_page_widgets/link_card.dart';
 import 'links_page_widgets/empty_state.dart';
 import 'links_page_widgets/link_options_menu.dart';
 import 'links_page_widgets/edit_notes_dialog.dart';
-import 'package:flutter/services.dart';
 
 enum SortOrder { latest, oldest }
 
-class LinksPage extends StatefulWidget {
-  final VoidCallback? onRefresh;
+class FolderLinksPage extends StatefulWidget {
+  final String folderName;
+  final List<LinkModel> links;
 
-  const LinksPage({super.key, this.onRefresh});
+  const FolderLinksPage({
+    super.key,
+    required this.folderName,
+    required this.links,
+  });
 
   @override
-  LinksPageState createState() => LinksPageState();
+  FolderLinksPageState createState() => FolderLinksPageState();
 }
 
-class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
+class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  List<LinkModel> _links = [];
   final List<LinkModel> _selectedLinks = [];
   bool _isGridView = false;
-  bool _isLoading = false;
   bool _isSelectionMode = false;
   late AnimationController _fabAnimationController;
   final ScrollController _scrollController = ScrollController();
@@ -43,7 +46,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       vsync: this,
     );
     _loadViewPreference();
-    loadLinks();
+    _sortLinks();
   }
 
   @override
@@ -56,34 +59,21 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   Future<void> _loadViewPreference() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _isGridView = prefs.getBool('links_page_view') ?? false;
+      _isGridView = prefs.getBool('folder_links_page_view') ?? false;
     });
   }
 
   Future<void> _saveViewPreference() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('links_page_view', _isGridView);
-  }
-
-  Future<void> loadLinks() async {
-    setState(() => _isLoading = true);
-    try {
-      final links = await _dbHelper.getAllLinks();
-      setState(() {
-        _links = links;
-        _sortLinks();
-      });
-    } catch (e) {
-      _showSnackBar('Error loading links: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await prefs.setBool('folder_links_page_view', _isGridView);
   }
 
   void _sortLinks() {
-    _links.sort((a, b) => _sortOrder == SortOrder.latest
-        ? b.createdAt.compareTo(a.createdAt)
-        : a.createdAt.compareTo(b.createdAt));
+    setState(() {
+      widget.links.sort((a, b) => _sortOrder == SortOrder.latest
+          ? b.createdAt.compareTo(a.createdAt)
+          : a.createdAt.compareTo(b.createdAt));
+    });
   }
 
   void _toggleSelectionMode() {
@@ -102,11 +92,11 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
 
   void _selectAllLinks() {
     setState(() {
-      if (_selectedLinks.length == _links.length) {
+      if (_selectedLinks.length == widget.links.length) {
         _selectedLinks.clear();
       } else {
         _selectedLinks.clear();
-        _selectedLinks.addAll(_links);
+        _selectedLinks.addAll(widget.links);
         if (!_isSelectionMode) {
           _toggleSelectionMode();
         }
@@ -172,11 +162,12 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       for (final link in _selectedLinks) {
         if (link.id != null) {
           await _dbHelper.deleteLink(link.id!);
+          widget.links.removeWhere((l) => l.id == link.id);
         }
       }
       _selectedLinks.clear();
       _toggleSelectionMode();
-      await loadLinks();
+      setState(() {});
       _showSnackBar('Links deleted successfully');
     }
   }
@@ -196,9 +187,9 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Saved Links',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          widget.folderName,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
@@ -207,14 +198,30 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
-              setState(() => _isLoading = true);
               try {
                 await MetadataService.clearCache();
-                await loadLinks();
+                for (var link in widget.links) {
+                  final updatedMetadata = await MetadataService.extractMetadata(link.url);
+                  if (updatedMetadata != null) {
+                    final updatedLink = link.copyWith(
+                      title: updatedMetadata.title,
+                      description: updatedMetadata.description,
+                      imageUrl: updatedMetadata.imageUrl,
+                      domain: updatedMetadata.domain,
+                      notes: link.notes,
+                    );
+                    await _dbHelper.updateLink(updatedLink);
+                    setState(() {
+                      final index = widget.links.indexWhere((l) => l.id == link.id);
+                      if (index != -1) {
+                        widget.links[index] = updatedLink;
+                      }
+                      _sortLinks();
+                    });
+                  }
+                }
               } catch (e) {
                 _showSnackBar('Error refreshing: $e');
-              } finally {
-                setState(() => _isLoading = false);
               }
             },
             tooltip: 'Refresh metadata',
@@ -222,11 +229,11 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           if (_isSelectionMode)
             IconButton(
               icon: Icon(
-                _selectedLinks.length == _links.length ? Icons.deselect : Icons.select_all,
+                _selectedLinks.length == widget.links.length ? Icons.deselect : Icons.select_all,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
               onPressed: _selectAllLinks,
-              tooltip: _selectedLinks.length == _links.length ? 'Deselect all' : 'Select all',
+              tooltip: _selectedLinks.length == widget.links.length ? 'Deselect all' : 'Select all',
             ),
           PopupMenuButton<SortOrder>(
             icon: Icon(
@@ -266,12 +273,14 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _links.isEmpty
+      body: widget.links.isEmpty
           ? const EmptyState()
           : RefreshIndicator(
-        onRefresh: loadLinks,
+        onRefresh: () async {
+          setState(() {
+            _sortLinks();
+          });
+        },
         child: _isGridView
             ? GridView.builder(
           controller: _scrollController,
@@ -282,40 +291,40 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             crossAxisSpacing: 4,
             mainAxisSpacing: 4,
           ),
-          itemCount: _links.length,
+          itemCount: widget.links.length,
           itemBuilder: (context, index) => LinkCard(
-            link: _links[index],
+            link: widget.links[index],
             isGridView: _isGridView,
             isSelectionMode: _isSelectionMode,
-            isSelected: _selectedLinks.contains(_links[index]),
-            onTap: () => _toggleLinkSelection(_links[index]),
+            isSelected: _selectedLinks.contains(widget.links[index]),
+            onTap: () => _toggleLinkSelection(widget.links[index]),
             onLongPress: () {
               if (!_isSelectionMode) {
                 _toggleSelectionMode();
               }
-              _toggleLinkSelection(_links[index]);
+              _toggleLinkSelection(widget.links[index]);
             },
-            onOptionsTap: () => _showLinkOptionsMenu(context, _links[index]),
+            onOptionsTap: () => _showLinkOptionsMenu(context, widget.links[index]),
             onOpenLink: (url, useDefaultBrowser) => _openLink(url, useDefaultBrowser: useDefaultBrowser),
           ),
         )
             : ListView.builder(
           controller: _scrollController,
           padding: const EdgeInsets.only(bottom: 100, top: 16),
-          itemCount: _links.length,
+          itemCount: widget.links.length,
           itemBuilder: (context, index) => LinkCard(
-            link: _links[index],
+            link: widget.links[index],
             isGridView: _isGridView,
             isSelectionMode: _isSelectionMode,
-            isSelected: _selectedLinks.contains(_links[index]),
-            onTap: () => _toggleLinkSelection(_links[index]),
+            isSelected: _selectedLinks.contains(widget.links[index]),
+            onTap: () => _toggleLinkSelection(widget.links[index]),
             onLongPress: () {
               if (!_isSelectionMode) {
                 _toggleSelectionMode();
               }
-              _toggleLinkSelection(_links[index]);
+              _toggleLinkSelection(widget.links[index]);
             },
-            onOptionsTap: () => _showLinkOptionsMenu(context, _links[index]),
+            onOptionsTap: () => _showLinkOptionsMenu(context, widget.links[index]),
             onOpenLink: (url, useDefaultBrowser) => _openLink(url, useDefaultBrowser: useDefaultBrowser),
           ),
         ),
@@ -439,7 +448,9 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           if (confirm == true && link.id != null) {
             final deletedLink = link;
             await _dbHelper.deleteLink(link.id!);
-            await loadLinks();
+            setState(() {
+              widget.links.removeWhere((l) => l.id == link.id);
+            });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text('Link deleted'),
@@ -451,7 +462,10 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                   textColor: Colors.blue,
                   onPressed: () async {
                     await _dbHelper.insertLink(deletedLink);
-                    await loadLinks();
+                    setState(() {
+                      widget.links.add(deletedLink);
+                      _sortLinks();
+                    });
                   },
                 ),
               ),
@@ -468,9 +482,14 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       builder: (context) => EditNotesDialog(
         link: link,
         onSave: (updatedLink) async {
-          print('LinksPage: Updating link ID: ${updatedLink.id}, notes: ${updatedLink.notes}');
           await _dbHelper.updateLink(updatedLink);
-          await loadLinks();
+          setState(() {
+            final index = widget.links.indexWhere((l) => l.id == link.id);
+            if (index != -1) {
+              widget.links[index] = updatedLink;
+            }
+            _sortLinks();
+          });
           _showSnackBar('Notes saved');
         },
       ),
