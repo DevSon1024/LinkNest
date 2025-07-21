@@ -1,6 +1,6 @@
 {
-    "name": "link_saver",
-    "short_name": "link_saver",
+    "name": "link_nest",
+    "short_name": "link_nest",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
