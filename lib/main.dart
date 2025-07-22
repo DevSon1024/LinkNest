@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'pages/home_screen.dart';
 import 'pages/links_page.dart';
-import 'screens/links_folders_page.dart';
+import 'pages/links_folders_page.dart';
 import 'pages/input_page.dart';
 import 'screens/menu_page.dart';
 import 'screens/theme_notifier.dart';

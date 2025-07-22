@@ -46,7 +46,7 @@ class LinkModel {
       imageUrl: map['imageUrl'] ?? '',
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       domain: map['domain'] ?? '',
-      tags: map['tags'] != null ? List<String>.from(json.decode(map['tags'])) : [],
+      tags: map['tags'] != null ? List<String>.from(json.decode(map['tags'])) : <String>[],
       notes: map['notes'],
     );
   }
@@ -61,6 +61,7 @@ class LinkModel {
     String? domain,
     List<String>? tags,
     String? notes,
+    bool clearNotes = false,
   }) {
     return LinkModel(
       id: id ?? this.id,
@@ -71,7 +72,7 @@ class LinkModel {
       createdAt: createdAt ?? this.createdAt,
       domain: domain ?? this.domain,
       tags: tags ?? this.tags,
-      notes: notes ?? this.notes,
+      notes: clearNotes ? null : (notes ?? this.notes),
     );
   }
 }
