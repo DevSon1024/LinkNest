@@ -28,18 +28,18 @@ class DatabaseHelper {
 
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
-      CREATE TABLE links(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        url TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        imageUrl TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        domain TEXT NOT NULL,
-        tags TEXT NOT NULL,
-        notes TEXT,
-        orderIndex INTEGER
-      )
+    CREATE TABLE links(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      imageUrl TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      domain TEXT NOT NULL,
+      tags TEXT NOT NULL,
+      notes TEXT,
+      orderIndex INTEGER
+    )
     ''');
   }
 
@@ -67,89 +67,47 @@ class DatabaseHelper {
   Future<int> insertLink(LinkModel link) async {
     final db = await database;
     final normalizedUrl = _normalizeUrl(link.url);
-    print('DatabaseHelper: Inserting link ID: ${link.id}, URL: $normalizedUrl');
     return await db.insert('links', link.toMap()..['url'] = normalizedUrl, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<LinkModel>> getAllLinks() async {
     final db = await database;
-    print('DatabaseHelper: Fetching all links');
     final List<Map<String, dynamic>> maps = await db.query(
       'links',
       orderBy: 'orderIndex ASC, createdAt DESC',
     );
-    print('DatabaseHelper: Fetched ${maps.length} links');
     return List.generate(maps.length, (i) => LinkModel.fromMap(maps[i]));
   }
 
   Future<int> updateLink(LinkModel link) async {
     final db = await database;
     final normalizedUrl = _normalizeUrl(link.url);
-    print('DatabaseHelper: Updating link ID: ${link.id}, URL: $normalizedUrl, Notes: "${link.notes}"');
-    try {
-      final linkMap = link.toMap();
-      linkMap['url'] = normalizedUrl;
-
-      // Explicitly handle notes field
-      if (link.notes == null) {
-        linkMap['notes'] = null;
-      }
-
-      print('DatabaseHelper: Link map before update: $linkMap');
-
-      final result = await db.update(
-        'links',
-        linkMap,
-        where: 'id = ?',
-        whereArgs: [link.id],
-      );
-      print('DatabaseHelper: Updated link ID: ${link.id}, Rows affected: $result');
-
-      // Verify the update by fetching the record
-      final verifyResult = await db.query(
-        'links',
-        where: 'id = ?',
-        whereArgs: [link.id],
-      );
-      if (verifyResult.isNotEmpty) {
-        print('DatabaseHelper: Verification - Notes field after update: "${verifyResult.first['notes']}"');
-      }
-
-      return result;
-    } catch (e) {
-      print('DatabaseHelper: Error updating link ID: ${link.id}, Error: $e');
-      rethrow;
-    }
+    return await db.update(
+      'links',
+      link.toMap()..['url'] = normalizedUrl,
+      where: 'url = ?',
+      whereArgs: [normalizedUrl],
+    );
   }
 
   Future<int> deleteLink(int id) async {
     final db = await database;
-    print('DatabaseHelper: Deleting link ID: $id');
-    try {
-      final result = await db.delete(
-        'links',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      print('DatabaseHelper: Deleted link ID: $id, Rows affected: $result');
-      return result;
-    } catch (e) {
-      print('DatabaseHelper: Error deleting link ID: $id, Error: $e');
-      rethrow;
-    }
+    return await db.delete(
+      'links',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<bool> linkExists(String url) async {
     final db = await database;
     final normalizedUrl = _normalizeUrl(url);
-    print('DatabaseHelper: Checking if link exists: $normalizedUrl');
     final List<Map<String, dynamic>> maps = await db.query(
       'links',
       where: 'url = ?',
       whereArgs: [normalizedUrl],
       limit: 1,
     );
-    print('DatabaseHelper: Link exists: ${maps.isNotEmpty}');
     return maps.isNotEmpty;
   }
 }
