@@ -18,11 +18,13 @@
 ## 📱 Screenshots
 
 <div align="center">
-<img src="screenshots/Home.jpg" width="30%" />
-<img src="screenshots/Links_Page.jpg" width="30%" />
-<img src="screenshots/LInks_Folder.jpg" width="30%" />
-<img src="screenshots/Backup_Page.jpg" width="30%" />
-<img src="screenshots/Version_Page.jpg" width="30%" />
+<img src="screenshots/SS_1.jpg" width="30%" />
+<img src="screenshots/SS_2.jpg" width="30%" />
+<img src="screenshots/SS_3.jpg" width="30%" />
+<img src="screenshots/SS_4.jpg" width="30%" />
+<img src="screenshots/SS_5.jpg" width="30%" />
+<img src="screenshots/SS_6.jpg" width="30%" />
+<img src="screenshots/SS_7.jpg" width="30%" />
 </div>
 
 ---
