@@ -25,6 +25,8 @@
 <img src="screenshots/SS_5.jpg" width="30%" />
 <img src="screenshots/SS_6.jpg" width="30%" />
 <img src="screenshots/SS_7.jpg" width="30%" />
+
+* i have make some spell mistake in SS_2.jpg for showing you can add notes as per you want
 </div>
 
 ---
