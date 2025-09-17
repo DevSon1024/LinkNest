@@ -27,6 +27,8 @@ class LinkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isMetadataReady = link.status == MetadataStatus.completed && link.title != null && link.title!.isNotEmpty;
+
     if (isGridView) {
       return GestureDetector(
         onTap: () {
@@ -68,22 +70,18 @@ class LinkCard extends StatelessWidget {
                         flex: 3,
                         child: Container(
                           color: Theme.of(context).colorScheme.surfaceContainer,
-                          child: link.imageUrl.isNotEmpty
+                          child: isMetadataReady && link.imageUrl != null && link.imageUrl!.isNotEmpty
                               ? CachedNetworkImage(
-                            imageUrl: link.imageUrl,
+                            imageUrl: link.imageUrl!,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Shimmer.fromColors(
                               baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                               highlightColor: Theme.of(context).colorScheme.surfaceContainer,
                               child: Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                             ),
-                            errorWidget: (context, url, error) => Center(
-                              child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
+                            errorWidget: (context, url, error) => _buildPlaceholderIcon(context),
                           )
-                              : Center(
-                            child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                          ),
+                              : _buildPlaceholderIcon(context),
                         ),
                       ),
                       Container(
@@ -93,7 +91,7 @@ class LinkCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              link.title,
+                              isMetadataReady ? link.title! : link.domain,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
@@ -132,18 +130,6 @@ class LinkCard extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            if (link.notes != null && link.notes!.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                link.notes!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  fontSize: 12,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -220,25 +206,23 @@ class LinkCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-                  child: link.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                    imageUrl: link.imageUrl,
-                    placeholder: (context, url) => Icon(
-                      Icons.link,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    errorWidget: (context, url, error) => Icon(
-                      Icons.link,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    fit: BoxFit.cover,
-                  )
-                      : Icon(
-                    Icons.link,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: isMetadataReady && link.imageUrl != null && link.imageUrl!.isNotEmpty
+                        ? CachedNetworkImage(
+                      imageUrl: link.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Shimmer.fromColors(
+                        baseColor: Colors.grey[300]!,
+                        highlightColor: Colors.grey[100]!,
+                        child: Container(color: Colors.white),
+                      ),
+                      errorWidget: (context, url, error) => _buildPlaceholderFavicon(context),
+                    )
+                        : _buildPlaceholderFavicon(context),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -248,44 +232,22 @@ class LinkCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        link.title,
+                        isMetadataReady ? link.title! : link.url,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (link.description.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          link.description,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
                       const SizedBox(height: 4),
                       Text(
-                        link.domain,
+                        isMetadataReady ? (link.description ?? link.domain) : link.domain,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (link.notes != null && link.notes!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          link.notes!,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -323,5 +285,28 @@ class LinkCard extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Widget _buildPlaceholderIcon(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: Center(
+        child: Icon(
+          Icons.link,
+          size: 40,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderFavicon(BuildContext context) {
+    return CircleAvatar(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      child: CachedNetworkImage(
+        imageUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=${link.domain}',
+        errorWidget: (context, url, error) => const Icon(Icons.public),
+      ),
+    );
   }
 }

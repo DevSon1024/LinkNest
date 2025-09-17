@@ -1,26 +1,30 @@
 import 'dart:convert';
 
+enum MetadataStatus { pending, completed, failed }
+
 class LinkModel {
   final int? id;
   final String url;
-  final String title;
-  final String description;
-  final String imageUrl;
+  final String? title; // Now nullable
+  final String? description; // Now nullable
+  final String? imageUrl; // Now nullable
   final DateTime createdAt;
   final String domain;
   final List<String> tags;
   final String? notes;
+  final MetadataStatus status; // New field
 
   LinkModel({
     this.id,
     required this.url,
-    required this.title,
-    required this.description,
-    required this.imageUrl,
+    this.title,
+    this.description,
+    this.imageUrl,
     required this.createdAt,
     required this.domain,
-    required this.tags,
+    this.tags = const [],
     this.notes,
+    this.status = MetadataStatus.pending,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +38,7 @@ class LinkModel {
       'domain': domain,
       'tags': json.encode(tags),
       'notes': notes,
+      'status': status.name, // Store status as a string
     };
   }
 
@@ -41,13 +46,17 @@ class LinkModel {
     return LinkModel(
       id: map['id'],
       url: map['url'] ?? '',
-      title: map['title'] ?? '',
-      description: map['description'] ?? '',
-      imageUrl: map['imageUrl'] ?? '',
+      title: map['title'],
+      description: map['description'],
+      imageUrl: map['imageUrl'],
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       domain: map['domain'] ?? '',
       tags: map['tags'] != null ? List<String>.from(json.decode(map['tags'])) : <String>[],
       notes: map['notes'],
+      status: MetadataStatus.values.firstWhere(
+            (e) => e.name == map['status'],
+        orElse: () => MetadataStatus.pending,
+      ),
     );
   }
 

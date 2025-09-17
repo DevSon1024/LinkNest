@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'pages/home_screen.dart';
@@ -10,9 +11,11 @@ import 'screens/theme_notifier.dart';
 import 'dart:async';
 import 'services/metadata_service.dart';
 import 'services/database_helper.dart';
+import 'services/background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeService();
   runApp(const LinkNestApp());
 }
 
@@ -145,6 +148,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _processSharedMedia(List<SharedMediaFile> files) async {
+    final dbHelper = DatabaseHelper();
     for (final file in files) {
       final url = file.path;
       if (url.isEmpty || !MetadataService.isValidUrl(url)) {
@@ -159,6 +163,29 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         print('Link already exists: $normalizedUrl');
         _showSnackBar('Link already exists: $normalizedUrl');
         continue;
+      }
+
+      // --- New Instant Save Logic ---
+      final domain = Uri.tryParse(url)?.host ?? '';
+      final newLink = LinkModel(
+        url: url,
+        createdAt: DateTime.now(),
+        domain: domain,
+        status: MetadataStatus.pending, // Start as pending
+      );
+
+      try {
+        await dbHelper.insertLink(newLink);
+        _showSnackBar('Link saved! Fetching details...');
+
+        // Trigger background service to start fetching
+        final service = FlutterBackgroundService();
+        service.invoke('startFetching');
+
+        // Refresh UI
+        refreshLinks();
+      } catch (e) {
+        _showSnackBar('Link already exists!');
       }
 
       final metadata = await MetadataService.extractMetadata(normalizedUrl);

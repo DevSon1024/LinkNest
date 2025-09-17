@@ -8,7 +8,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static Database? _database;
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -30,15 +30,15 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE links(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        url TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        imageUrl TEXT NOT NULL,
+        url TEXT NOT NULL UNIQUE, // <-- Add UNIQUE constraint
+        title TEXT,
+        description TEXT,
+        imageUrl TEXT,
         createdAt INTEGER NOT NULL,
         domain TEXT NOT NULL,
-        tags TEXT NOT NULL,
+        tags TEXT,
         notes TEXT,
-        orderIndex INTEGER
+        status TEXT NOT NULL DEFAULT "pending" // <-- Add status field
       )
     ''');
   }
@@ -49,7 +49,27 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE links ADD COLUMN notes TEXT;');
     }
     if (oldVersion < 3) {
-      await db.execute('ALTER TABLE links ADD COLUMN orderIndex INTEGER;');
+      // Add status and make URL unique
+      await db.execute('ALTER TABLE links ADD COLUMN status TEXT NOT NULL DEFAULT "pending";');
+      // Recreate table to add UNIQUE constraint on URL
+      await db.execute('CREATE TABLE links_new AS SELECT * FROM links;');
+      await db.execute('DROP TABLE links;');
+      await db.execute('''
+        CREATE TABLE links(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          url TEXT NOT NULL UNIQUE,
+          title TEXT,
+          description TEXT,
+          imageUrl TEXT,
+          createdAt INTEGER NOT NULL,
+          domain TEXT NOT NULL,
+          tags TEXT,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT "pending"
+        )
+      ''');
+      await db.execute('INSERT INTO links SELECT * FROM links_new;');
+      await db.execute('DROP TABLE links_new;');
     }
   }
 
