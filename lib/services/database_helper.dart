@@ -30,7 +30,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE links(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        url TEXT NOT NULL UNIQUE, // <-- Add UNIQUE constraint
+        url TEXT NOT NULL UNIQUE,
         title TEXT,
         description TEXT,
         imageUrl TEXT,
@@ -38,7 +38,7 @@ class DatabaseHelper {
         domain TEXT NOT NULL,
         tags TEXT,
         notes TEXT,
-        status TEXT NOT NULL DEFAULT "pending" // <-- Add status field
+        status TEXT NOT NULL DEFAULT "pending"
       )
     ''');
   }
@@ -49,9 +49,7 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE links ADD COLUMN notes TEXT;');
     }
     if (oldVersion < 3) {
-      // Add status and make URL unique
       await db.execute('ALTER TABLE links ADD COLUMN status TEXT NOT NULL DEFAULT "pending";');
-      // Recreate table to add UNIQUE constraint on URL
       await db.execute('CREATE TABLE links_new AS SELECT * FROM links;');
       await db.execute('DROP TABLE links;');
       await db.execute('''
@@ -88,7 +86,7 @@ class DatabaseHelper {
     final db = await database;
     final normalizedUrl = _normalizeUrl(link.url);
     print('DatabaseHelper: Inserting link ID: ${link.id}, URL: $normalizedUrl');
-    return await db.insert('links', link.toMap()..['url'] = normalizedUrl, conflictAlgorithm: ConflictAlgorithm.replace);
+    return await db.insert('links', link.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<LinkModel>> getAllLinks() async {
@@ -96,7 +94,7 @@ class DatabaseHelper {
     print('DatabaseHelper: Fetching all links');
     final List<Map<String, dynamic>> maps = await db.query(
       'links',
-      orderBy: 'orderIndex ASC, createdAt DESC',
+      orderBy: 'createdAt DESC',
     );
     print('DatabaseHelper: Fetched ${maps.length} links');
     return List.generate(maps.length, (i) => LinkModel.fromMap(maps[i]));
@@ -110,7 +108,6 @@ class DatabaseHelper {
       final linkMap = link.toMap();
       linkMap['url'] = normalizedUrl;
 
-      // Explicitly handle notes field
       if (link.notes == null) {
         linkMap['notes'] = null;
       }
@@ -125,7 +122,6 @@ class DatabaseHelper {
       );
       print('DatabaseHelper: Updated link ID: ${link.id}, Rows affected: $result');
 
-      // Verify the update by fetching the record
       final verifyResult = await db.query(
         'links',
         where: 'id = ?',

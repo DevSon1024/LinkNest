@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'models/link_model.dart';
 import 'pages/home_screen.dart';
 import 'pages/links_page.dart';
 import 'pages/links_folders_page.dart';
@@ -158,7 +159,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       }
 
       final normalizedUrl = _normalizeUrl(url);
-      final dbHelper = DatabaseHelper();
       if (await dbHelper.linkExists(normalizedUrl)) {
         print('Link already exists: $normalizedUrl');
         _showSnackBar('Link already exists: $normalizedUrl');
@@ -186,20 +186,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         refreshLinks();
       } catch (e) {
         _showSnackBar('Link already exists!');
-      }
-
-      final metadata = await MetadataService.extractMetadata(normalizedUrl);
-      if (metadata != null) {
-        await dbHelper.insertLink(metadata);
-        print('Link saved successfully: $normalizedUrl');
-        _showSnackBar('Link saved successfully', showViewAction: true);
-        if (mounted) {
-          _linksPageKey.currentState?.loadLinks();
-          _foldersPageKey.currentState?.loadFolders();
-        }
-      } else {
-        print('Failed to extract metadata for: $normalizedUrl');
-        _showSnackBar('Failed to extract metadata for: $normalizedUrl');
       }
     }
   }

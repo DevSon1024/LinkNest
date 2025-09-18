@@ -1,11 +1,9 @@
-// lib/services/background_service.dart
-
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:link_nest/models/link_model.dart';
-import 'package:link_nest/services/database_helper.dart';
-import 'package:link_nest/services/metadata_service.dart';
+import '../models/link_model.dart';
+import 'database_helper.dart';
+import 'metadata_service.dart';
 
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();

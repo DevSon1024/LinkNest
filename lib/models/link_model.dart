@@ -71,6 +71,7 @@ class LinkModel {
     List<String>? tags,
     String? notes,
     bool clearNotes = false,
+    MetadataStatus? status,
   }) {
     return LinkModel(
       id: id ?? this.id,
@@ -82,6 +83,7 @@ class LinkModel {
       domain: domain ?? this.domain,
       tags: tags ?? this.tags,
       notes: clearNotes ? null : (notes ?? this.notes),
+      status: status ?? this.status,
     );
   }
 }

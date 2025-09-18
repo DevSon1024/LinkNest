@@ -33,20 +33,17 @@ class StorageSettingState extends State<StorageSetting> {
 
   Future<void> _checkPermissionStatus() async {
     try {
-      // Check Android version using device_info_plus
       if (Platform.isAndroid) {
         final deviceInfo = DeviceInfoPlugin();
         final androidInfo = await deviceInfo.androidInfo;
         final sdkInt = androidInfo.version.sdkInt;
 
-        // Only check storage permission for Android 12 (API 31) and below
         if (sdkInt <= 31) {
           final status = await Permission.storage.status;
           setState(() {
             _hasStoragePermission = status.isGranted;
           });
         } else {
-          // Android 13+ doesn't need storage permission for SAF
           setState(() {
             _hasStoragePermission = true;
           });
@@ -58,7 +55,6 @@ class StorageSettingState extends State<StorageSetting> {
       }
     } catch (e) {
       print('Error checking permission status: $e');
-      // Default to true if we can't determine the version
       setState(() {
         _hasStoragePermission = true;
       });
@@ -85,7 +81,6 @@ class StorageSettingState extends State<StorageSetting> {
     });
 
     try {
-      // Check permissions if needed
       if (!_hasStoragePermission) {
         final granted = await Navigator.push(
           context,
@@ -100,7 +95,6 @@ class StorageSettingState extends State<StorageSetting> {
         await _checkPermissionStatus();
       }
 
-      // Show loading dialog
       if (mounted) {
         showDialog(
           context: context,
@@ -117,7 +111,6 @@ class StorageSettingState extends State<StorageSetting> {
         );
       }
 
-      // Get all links from database
       final links = await _dbHelper.getAllLinks();
       if (links.isEmpty) {
         if (mounted) Navigator.of(context).pop();
@@ -125,7 +118,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Create export data structure
       final exportData = {
         'version': '1.0',
         'exported_at': DateTime.now().toIso8601String(),
@@ -143,18 +135,14 @@ class StorageSettingState extends State<StorageSetting> {
         }).toList(),
       };
 
-      // Convert to JSON string
       final jsonString = jsonEncode(exportData);
       print('Export data prepared - Links: ${links.length}, JSON size: ${jsonString.length} bytes');
 
-      // Create temporary directory and file
       final tempDir = await getTemporaryDirectory();
       final tempJsonFile = File('${tempDir.path}/links_backup_${DateTime.now().millisecondsSinceEpoch}.json');
 
-      // Write JSON to temporary file
       await tempJsonFile.writeAsString(jsonString, flush: true);
 
-      // Verify file was created
       if (!await tempJsonFile.exists()) {
         if (mounted) Navigator.of(context).pop();
         _showSnackBar('Failed to create backup file');
@@ -169,11 +157,9 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Create ZIP archive
       final jsonBytes = await tempJsonFile.readAsBytes();
       final archive = Archive();
 
-      // Add JSON file to archive
       final archiveFile = ArchiveFile(
         'links_backup.json',
         jsonBytes.length,
@@ -181,10 +167,8 @@ class StorageSettingState extends State<StorageSetting> {
       );
       archive.addFile(archiveFile);
 
-      // Encode archive to ZIP
       final zipData = ZipEncoder().encode(archive);
 
-      // Clean up temporary file
       await tempJsonFile.delete();
 
       if (zipData == null || zipData.isEmpty) {
@@ -193,11 +177,9 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Generate filename with timestamp
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'linknest_backup_$timestamp.zip';
 
-      // Use Storage Access Framework to save file
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'Save LinkNest Backup',
         fileName: fileName,
@@ -213,7 +195,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Show success message
       _showSnackBar('Backup exported successfully!\nFile: $fileName');
       print('Export completed successfully: $result');
 
@@ -237,7 +218,6 @@ class StorageSettingState extends State<StorageSetting> {
     });
 
     try {
-      // Check permissions if needed
       if (!_hasStoragePermission) {
         final granted = await Navigator.push(
           context,
@@ -252,7 +232,6 @@ class StorageSettingState extends State<StorageSetting> {
         await _checkPermissionStatus();
       }
 
-      // Pick file
       final result = await FilePicker.platform.pickFiles(
         allowedExtensions: ['zip'],
         type: FileType.custom,
@@ -264,7 +243,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Show loading dialog
       if (mounted) {
         showDialog(
           context: context,
@@ -284,10 +262,9 @@ class StorageSettingState extends State<StorageSetting> {
       final pickedFile = result.files.single;
       List<int> bytes;
 
-      // Read file bytes
       if (pickedFile.bytes != null) {
         bytes = pickedFile.bytes!;
-      } else if (pickedFile.path != null) {
+      } else {
         final file = File(pickedFile.path!);
         if (!await file.exists()) {
           if (mounted) Navigator.of(context).pop();
@@ -295,31 +272,24 @@ class StorageSettingState extends State<StorageSetting> {
           return;
         }
         bytes = await file.readAsBytes();
-      } else {
-        if (mounted) Navigator.of(context).pop();
-        _showSnackBar('Unable to read selected file');
-        return;
       }
 
       print('Reading ZIP file: ${bytes.length} bytes');
 
-      // Decode ZIP archive
       final archive = ZipDecoder().decodeBytes(bytes);
       print('Archive contains ${archive.files.length} files');
 
-      // Find the JSON backup file
       final jsonFile = archive.files.firstWhere(
             (file) => file.name == 'links_backup.json',
         orElse: () => throw Exception('links_backup.json not found in archive'),
       );
 
-      if (jsonFile.content == null || jsonFile.content.isEmpty) {
+      if (jsonFile.content == null || (jsonFile.content as List).isEmpty) {
         if (mounted) Navigator.of(context).pop();
         _showSnackBar('Backup file is empty');
         return;
       }
 
-      // Decode JSON content
       final jsonString = utf8.decode(jsonFile.content as List<int>);
       print('JSON content length: ${jsonString.length}');
 
@@ -329,7 +299,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Parse JSON
       final Map<String, dynamic> backupData = jsonDecode(jsonString);
       final List<dynamic> linksData = backupData['links'] ?? [];
 
@@ -339,7 +308,6 @@ class StorageSettingState extends State<StorageSetting> {
         return;
       }
 
-      // Import links to database
       final db = await _dbHelper.database;
       final batch = db.batch();
       int importedCount = 0;
@@ -356,7 +324,6 @@ class StorageSettingState extends State<StorageSetting> {
             continue;
           }
 
-          // Extract link data
           final title = map['title'] as String? ?? 'Untitled';
           final description = map['description'] as String? ?? '';
           final imageUrl = map['imageUrl'] as String? ?? '';
@@ -373,7 +340,6 @@ class StorageSettingState extends State<StorageSetting> {
             createdAt = DateTime.now();
           }
 
-          // Create LinkModel
           final linkModel = LinkModel(
             url: url,
             title: title,
@@ -385,10 +351,8 @@ class StorageSettingState extends State<StorageSetting> {
             createdAt: createdAt,
           );
 
-          // Check if link already exists
           final exists = await _dbHelper.linkExists(url);
           if (exists) {
-            // Update existing link
             final existingLinks = await _dbHelper.getAllLinks();
             final existingLink = existingLinks.firstWhere(
                   (link) => link.url == url,
@@ -405,7 +369,6 @@ class StorageSettingState extends State<StorageSetting> {
               updatedCount++;
             }
           } else {
-            // Insert new link
             batch.insert(
               'links',
               linkModel.toMap(),
@@ -419,13 +382,10 @@ class StorageSettingState extends State<StorageSetting> {
         }
       }
 
-      // Commit batch operations
       await batch.commit(noResult: true);
 
       if (mounted) Navigator.of(context).pop();
 
-      // Show import results
-      final totalProcessed = importedCount + updatedCount;
       String message = 'Import completed!\n';
       if (importedCount > 0) message += '$importedCount new links added\n';
       if (updatedCount > 0) message += '$updatedCount links updated\n';
@@ -454,7 +414,6 @@ class StorageSettingState extends State<StorageSetting> {
     });
 
     try {
-      // Show loading dialog
       if (mounted) {
         showDialog(
           context: context,
@@ -471,24 +430,17 @@ class StorageSettingState extends State<StorageSetting> {
         );
       }
 
-      // Clear different types of cache
       await DefaultCacheManager().emptyCache();
-
-      // Clear Flutter image cache
       imageCache.clear();
       imageCache.clearLiveImages();
 
-      // Clear temporary directory
       final tempDir = await getTemporaryDirectory();
       if (await tempDir.exists()) {
         await tempDir.delete(recursive: true);
         await tempDir.create(recursive: true);
       }
 
-      // Clear metadata cache if available
       try {
-        // This assumes MetadataService has a clearCache method
-        // You might need to import and call it here
         print('Cache cleared successfully');
       } catch (e) {
         print('Error clearing metadata cache: $e');
@@ -616,7 +568,6 @@ class StorageSettingState extends State<StorageSetting> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Permission warning card
             if (!_hasStoragePermission)
               Card(
                 elevation: 2,
@@ -648,8 +599,6 @@ class StorageSettingState extends State<StorageSetting> {
                 ),
               ),
             if (!_hasStoragePermission) const SizedBox(height: 16),
-
-            // Export Data Card
             _buildActionCard(
               icon: Icons.backup_rounded,
               title: 'Export Data',
@@ -659,8 +608,6 @@ class StorageSettingState extends State<StorageSetting> {
               isLoading: _isLoading,
             ),
             const SizedBox(height: 16),
-
-            // Import Data Card
             _buildActionCard(
               icon: Icons.restore_rounded,
               title: 'Import Data',
@@ -670,8 +617,6 @@ class StorageSettingState extends State<StorageSetting> {
               isLoading: _isLoading,
             ),
             const SizedBox(height: 16),
-
-            // Clear Cache Card
             _buildActionCard(
               icon: Icons.cleaning_services_rounded,
               title: 'Clear Cache',

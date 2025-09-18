@@ -1,5 +1,3 @@
-// this is sub folder page of all links like instagram, yt etc.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -274,11 +272,11 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
     );
   }
 
-  void _shareLink(String url, String title) async {
+  void _shareLink(String url, String? title) async {
     try {
       await Share.share(
-        '$title\n$url',
-        subject: title.isNotEmpty ? title : 'Shared Link',
+        '${title ?? ""}\n$url',
+        subject: title != null && title.isNotEmpty ? title : 'Shared Link',
       );
     } catch (e) {
       _showSnackBar('Error sharing link: $e');
@@ -297,11 +295,11 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (link.imageUrl.isNotEmpty)
+              if (link.imageUrl != null && link.imageUrl!.isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: CachedNetworkImage(
-                    imageUrl: link.imageUrl,
+                    imageUrl: link.imageUrl!,
                     fit: BoxFit.cover,
                     height: 150,
                     width: double.infinity,
@@ -322,13 +320,13 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                 ),
               const SizedBox(height: 8),
               Text(
-                link.title,
+                link.title ?? 'No Title',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
                 [
-                  if (link.description.isNotEmpty) link.description,
+                  if (link.description != null && link.description!.isNotEmpty) link.description!,
                   'Domain: ${link.domain}',
                   if (link.tags.isNotEmpty) 'Tags: ${link.tags.join(', ')}',
                 ].join('\n'),
@@ -500,9 +498,9 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                         flex: 3,
                         child: Container(
                           color: Theme.of(context).colorScheme.surfaceContainer,
-                          child: link.imageUrl.isNotEmpty
+                          child: link.imageUrl != null && link.imageUrl!.isNotEmpty
                               ? CachedNetworkImage(
-                            imageUrl: link.imageUrl,
+                            imageUrl: link.imageUrl!,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Shimmer.fromColors(
                               baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -525,7 +523,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              link.title,
+                              link.title ?? 'No Title',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
@@ -660,9 +658,9 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-                  child: link.imageUrl.isNotEmpty
+                  child: link.imageUrl != null && link.imageUrl!.isNotEmpty
                       ? CachedNetworkImage(
-                    imageUrl: link.imageUrl,
+                    imageUrl: link.imageUrl!,
                     placeholder: (context, url) => Icon(
                       Icons.link,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -685,17 +683,17 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        link.title,
+                        link.title ?? 'No Title',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (link.description.isNotEmpty) ...[
+                      if (link.description != null && link.description!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
-                          link.description,
+                          link.description!,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),

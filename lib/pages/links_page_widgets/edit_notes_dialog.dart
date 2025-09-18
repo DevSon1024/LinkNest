@@ -77,11 +77,11 @@ class EditNotesDialogState extends State<EditNotesDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.link.imageUrl.isNotEmpty)
+            if (widget.link.imageUrl != null && widget.link.imageUrl!.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: CachedNetworkImage(
-                  imageUrl: widget.link.imageUrl,
+                  imageUrl: widget.link.imageUrl!,
                   fit: BoxFit.cover,
                   height: 150,
                   width: double.infinity,
@@ -102,7 +102,7 @@ class EditNotesDialogState extends State<EditNotesDialog> {
               ),
             const SizedBox(height: 12),
             Text(
-              widget.link.title,
+              widget.link.title ?? 'No Title',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.onSurface,
@@ -113,7 +113,7 @@ class EditNotesDialogState extends State<EditNotesDialog> {
             const SizedBox(height: 8),
             Text(
               [
-                if (widget.link.description.isNotEmpty) widget.link.description,
+                if (widget.link.description != null && widget.link.description!.isNotEmpty) widget.link.description!,
                 'Domain: ${widget.link.domain}',
                 if (widget.link.tags.isNotEmpty) 'Tags: ${widget.link.tags.join(', ')}',
               ].join('\n'),

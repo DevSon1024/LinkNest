@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/link_model.dart';
@@ -406,7 +404,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           try {
             await Share.share(
               '${link.title}\n${link.url}',
-              subject: link.title.isNotEmpty ? link.title : 'Shared Link',
+              subject: link.title != null && link.title!.isNotEmpty ? link.title! : 'Shared Link',
             );
           } catch (e) {
             _showSnackBar('Error sharing link: $e');

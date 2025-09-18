@@ -1,5 +1,3 @@
-// this is sub folder page of all links like instagram, yt etc.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -108,7 +106,7 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
     if (_selectedLinks.isEmpty) return;
 
     final linksText = _selectedLinks
-        .map((link) => '${link.title}\n${link.url}')
+        .map((link) => '${link.title ?? ""}\n${link.url}')
         .join('\n\n');
 
     try {
@@ -414,8 +412,8 @@ class FolderLinksPageState extends State<FolderLinksPage> with TickerProviderSta
         onShare: () async {
           try {
             await Share.share(
-              '${link.title}\n${link.url}',
-              subject: link.title.isNotEmpty ? link.title : 'Shared Link',
+              '${link.title ?? ""}\n${link.url}',
+              subject: link.title != null && link.title!.isNotEmpty ? link.title! : 'Shared Link',
             );
           } catch (e) {
             _showSnackBar('Error sharing link: $e');
