@@ -12,9 +12,12 @@ import 'screens/menu_page.dart';
 import 'screens/theme_notifier.dart';
 import 'services/database_helper.dart';
 import 'services/metadata_service.dart';
+import 'services/background_service.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeService();
   runApp(const LinkNestApp());
 }
 
@@ -66,7 +69,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _platformChannel.setMethodCallHandler(_handleMethodCall);
-    // Important: Check for background-saved links when the app starts
+
+    final service = FlutterBackgroundService();
+    service.startService();
+    service.invoke('startFetching');
+
     _processQuickSavedLinks();
   }
 
@@ -74,7 +81,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      // When the user returns to the app, check if any links were saved in the background
       _processQuickSavedLinks();
     }
   }
@@ -95,9 +101,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         }
         break;
       case "navigateToLinksPage":
-      // First, process any links that were just saved
         await _processQuickSavedLinks();
-        // Then, navigate to the links page
         _onNavItemTapped(1);
         break;
     }
@@ -108,7 +112,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final urlsToSave = prefs.getStringList('flutter.quick_save_urls');
 
     if (urlsToSave == null || urlsToSave.isEmpty) {
-      return; // No links to process
+      return;
     }
 
     final dbHelper = DatabaseHelper();

@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
+import org.json.JSONArray
 
 class QuickSaveActivity : AppCompatActivity() {
 
@@ -37,21 +38,20 @@ class QuickSaveActivity : AppCompatActivity() {
         val sharedPrefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
         val key = "flutter.quick_save_urls"
 
-        var existingUrls: MutableSet<String>
-        try {
-            // This is the correct way to read
-            existingUrls = sharedPrefs.getStringSet(key, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
-        } catch (e: ClassCastException) {
-            // This catches the crash if the old data was a String
-            // We clear the bad data and start with a fresh set
-            sharedPrefs.edit { remove(key) }
-            existingUrls = mutableSetOf()
+        val jsonString = sharedPrefs.getString(key, "[]")
+        val jsonArray = JSONArray(jsonString)
+        val existingUrls = mutableListOf<String>()
+        for (i in 0 until jsonArray.length()) {
+            existingUrls.add(jsonArray.getString(i))
         }
 
-        existingUrls.add(url)
+        if (!existingUrls.contains(url)) {
+            existingUrls.add(url)
+        }
 
+        val newJsonArray = JSONArray(existingUrls)
         sharedPrefs.edit {
-            putStringSet(key, existingUrls)
+            putString(key, newJsonArray.toString())
         }
     }
 
