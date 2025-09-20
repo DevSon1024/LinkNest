@@ -42,30 +42,6 @@ class LinkOptionsMenu extends StatelessWidget {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.open_in_new, color: Theme.of(context).colorScheme.onSurface),
-              title: const Text('Open Link (In-App)'),
-              onTap: () {
-                Navigator.pop(context);
-                onOpenInApp();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.open_in_browser, color: Theme.of(context).colorScheme.onSurface),
-              title: const Text('Open in Default Browser'),
-              onTap: () {
-                Navigator.pop(context);
-                onOpenInBrowser();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.blue),
-              title: const Text('Add/Edit Description', style: TextStyle(color: Colors.blue)),
-              onTap: () {
-                Navigator.pop(context);
-                onEditNotes();
-              },
-            ),
-            ListTile(
               leading: Icon(Icons.copy, color: Theme.of(context).colorScheme.onSurface),
               title: const Text('Copy URL'),
               onTap: () {
