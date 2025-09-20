@@ -11,7 +11,6 @@ class LinkCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onOptionsTap;
-  final Function(String, bool) onOpenLink;
 
   const LinkCard({
     super.key,
@@ -22,22 +21,18 @@ class LinkCard extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.onOptionsTap,
-    required this.onOpenLink,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isMetadataReady = link.status == MetadataStatus.completed && link.title != null && link.title!.isNotEmpty;
+    final bool isMetadataReady =
+        link.status == MetadataStatus.completed &&
+            link.title != null &&
+            link.title!.isNotEmpty;
 
     if (isGridView) {
       return GestureDetector(
-        onTap: () {
-          if (isSelectionMode) {
-            onTap();
-          } else {
-            onOpenLink(link.url, true);
-          }
-        },
+        onTap: onTap,
         onLongPress: onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -58,7 +53,8 @@ class LinkCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   border: isSelected
-                      ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                      ? Border.all(
+                      color: Theme.of(context).colorScheme.primary, width: 2)
                       : null,
                 ),
                 child: ClipRRect(
@@ -70,16 +66,27 @@ class LinkCard extends StatelessWidget {
                         flex: 3,
                         child: Container(
                           color: Theme.of(context).colorScheme.surfaceContainer,
-                          child: isMetadataReady && link.imageUrl != null && link.imageUrl!.isNotEmpty
+                          child: isMetadataReady &&
+                              link.imageUrl != null &&
+                              link.imageUrl!.isNotEmpty
                               ? CachedNetworkImage(
                             imageUrl: link.imageUrl!,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Shimmer.fromColors(
-                              baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                              highlightColor: Theme.of(context).colorScheme.surfaceContainer,
-                              child: Container(color: Theme.of(context).colorScheme.surfaceContainerHighest),
-                            ),
-                            errorWidget: (context, url, error) => _buildPlaceholderIcon(context),
+                            placeholder: (context, url) =>
+                                Shimmer.fromColors(
+                                  baseColor: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest,
+                                  highlightColor: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainer,
+                                  child: Container(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest),
+                                ),
+                            errorWidget: (context, url, error) =>
+                                _buildPlaceholderIcon(context),
                           )
                               : _buildPlaceholderIcon(context),
                         ),
@@ -108,12 +115,16 @@ class LinkCard extends StatelessWidget {
                                   height: 16,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest,
                                   ),
                                   child: Icon(
                                     Icons.language,
                                     size: 10,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(width: 6),
@@ -121,7 +132,9 @@ class LinkCard extends StatelessWidget {
                                   child: Text(
                                     link.domain,
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                       fontSize: 12,
                                     ),
                                     maxLines: 1,
@@ -149,14 +162,22 @@ class LinkCard extends StatelessWidget {
                       height: 24,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
                         border: Border.all(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
                           width: 2,
                         ),
                       ),
                       child: isSelected
-                          ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.onPrimary)
+                          ? Icon(Icons.check,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onPrimary)
                           : null,
                     ),
                   ),
@@ -172,7 +193,10 @@ class LinkCard extends StatelessWidget {
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
                       ),
                       child: Icon(
                         Icons.more_vert,
@@ -194,13 +218,7 @@ class LinkCard extends StatelessWidget {
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            if (isSelectionMode) {
-              onTap();
-            } else {
-              onOpenLink(link.url, true);
-            }
-          },
+          onTap: onTap,
           onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -211,7 +229,9 @@ class LinkCard extends StatelessWidget {
                   height: 60,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: isMetadataReady && link.imageUrl != null && link.imageUrl!.isNotEmpty
+                    child: isMetadataReady &&
+                        link.imageUrl != null &&
+                        link.imageUrl!.isNotEmpty
                         ? CachedNetworkImage(
                       imageUrl: link.imageUrl!,
                       fit: BoxFit.cover,
@@ -220,7 +240,8 @@ class LinkCard extends StatelessWidget {
                         highlightColor: Colors.grey[100]!,
                         child: Container(color: Colors.white),
                       ),
-                      errorWidget: (context, url, error) => _buildPlaceholderFavicon(context),
+                      errorWidget: (context, url, error) =>
+                          _buildPlaceholderFavicon(context),
                     )
                         : _buildPlaceholderFavicon(context),
                   ),
@@ -241,9 +262,13 @@ class LinkCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isMetadataReady ? (link.description ?? link.domain) : link.domain,
+                        isMetadataReady
+                            ? (link.description ?? link.domain)
+                            : link.domain,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -260,14 +285,22 @@ class LinkCard extends StatelessWidget {
                       height: 24,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
                         border: Border.all(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
                           width: 2,
                         ),
                       ),
                       child: isSelected
-                          ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.onPrimary)
+                          ? Icon(Icons.check,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onPrimary)
                           : null,
                     ),
                   )
@@ -304,7 +337,8 @@ class LinkCard extends StatelessWidget {
     return CircleAvatar(
       backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       child: CachedNetworkImage(
-        imageUrl: 'https://www.google.com/s2/favicons?sz=64&domain_url=${link.domain}',
+        imageUrl:
+        'https://www.google.com/s2/favicons?sz=64&domain_url=${link.domain}',
         errorWidget: (context, url, error) => const Icon(Icons.public),
       ),
     );

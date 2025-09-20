@@ -4,14 +4,14 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- Internet permission for fetching link metadata -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application
         android:label="LinkNest"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
@@ -34,7 +34,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- Primary intent filter for receiving shared text/links -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -45,20 +44,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-
-            <!-- Additional intent filter for broader text sharing -->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.SEND" />-->
-<!--                <category android:name="android.intent.category.DEFAULT" />-->
-<!--                <data android:mimeType="text/*" />-->
-<!--            </intent-filter>-->
-
-<!--            &lt;!&ndash; Intent filter specifically for URLs &ndash;&gt;-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.SEND" />-->
-<!--                <category android:name="android.intent.category.DEFAULT" />-->
-<!--                <data android:mimeType="*/*" />-->
-<!--            </intent-filter>-->
         </activity>
         <meta-data
             android:name="flutterEmbedding"

@@ -11,6 +11,7 @@ import 'links_page_widgets/link_options_menu.dart';
 import 'links_page_widgets/edit_notes_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'link_details_page.dart';
 
 enum SortOrder { latest, oldest }
 
@@ -149,7 +150,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Links'),
-        content: Text('Are you sure you want to delete ${_selectedLinks.length} link(s)?'),
+        content: Text(
+            'Are you sure you want to delete ${_selectedLinks.length} link(s)?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -159,7 +161,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
@@ -227,11 +230,15 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           if (_isSelectionMode)
             IconButton(
               icon: Icon(
-                _selectedLinks.length == _links.length ? Icons.deselect : Icons.select_all,
+                _selectedLinks.length == _links.length
+                    ? Icons.deselect
+                    : Icons.select_all,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
               onPressed: _selectAllLinks,
-              tooltip: _selectedLinks.length == _links.length ? 'Deselect all' : 'Select all',
+              tooltip: _selectedLinks.length == _links.length
+                  ? 'Deselect all'
+                  : 'Select all',
             ),
           PopupMenuButton<SortOrder>(
             icon: Icon(
@@ -281,7 +288,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             ? GridView.builder(
           controller: _scrollController,
           padding: const EdgeInsets.only(bottom: 80),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             childAspectRatio: 0.75,
             crossAxisSpacing: 4,
@@ -293,15 +301,27 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             isGridView: _isGridView,
             isSelectionMode: _isSelectionMode,
             isSelected: _selectedLinks.contains(_links[index]),
-            onTap: () => _toggleLinkSelection(_links[index]),
+            onTap: () {
+              if (_isSelectionMode) {
+                _toggleLinkSelection(_links[index]);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        LinkDetailsPage(link: _links[index]),
+                  ),
+                );
+              }
+            },
             onLongPress: () {
               if (!_isSelectionMode) {
                 _toggleSelectionMode();
               }
               _toggleLinkSelection(_links[index]);
             },
-            onOptionsTap: () => _showLinkOptionsMenu(context, _links[index]),
-            onOpenLink: (url, useDefaultBrowser) => _openLink(url, useDefaultBrowser: useDefaultBrowser),
+            onOptionsTap: () =>
+                _showLinkOptionsMenu(context, _links[index]),
           ),
         )
             : ListView.builder(
@@ -313,15 +333,27 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             isGridView: _isGridView,
             isSelectionMode: _isSelectionMode,
             isSelected: _selectedLinks.contains(_links[index]),
-            onTap: () => _toggleLinkSelection(_links[index]),
+            onTap: () {
+              if (_isSelectionMode) {
+                _toggleLinkSelection(_links[index]);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        LinkDetailsPage(link: _links[index]),
+                  ),
+                );
+              }
+            },
             onLongPress: () {
               if (!_isSelectionMode) {
                 _toggleSelectionMode();
               }
               _toggleLinkSelection(_links[index]);
             },
-            onOptionsTap: () => _showLinkOptionsMenu(context, _links[index]),
-            onOpenLink: (url, useDefaultBrowser) => _openLink(url, useDefaultBrowser: useDefaultBrowser),
+            onOptionsTap: () =>
+                _showLinkOptionsMenu(context, _links[index]),
           ),
         ),
       ),
@@ -339,7 +371,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                 child: FloatingActionButton(
                   onPressed: _shareSelectedLinks,
                   backgroundColor: Colors.blue,
-                  child: const Icon(Icons.share, color: Colors.white),
+                  child:
+                  const Icon(Icons.share, color: Colors.white),
                 ),
               ),
             ),
@@ -349,7 +382,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               child: FloatingActionButton(
                 onPressed: _deleteSelectedLinks,
                 backgroundColor: Colors.red,
-                child: const Icon(Icons.delete, color: Colors.white),
+                child:
+                const Icon(Icons.delete, color: Colors.white),
               ),
             ),
           ],
@@ -359,10 +393,99 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
   }
 
+  void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => LinkOptionsMenu(
+        link: link,
+        onOpenInApp: () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LinkDetailsPage(link: link),
+            ),
+          );
+        },
+        onOpenInBrowser: () => _openLink(link.url, useDefaultBrowser: true),
+        onEditNotes: () => _showEditNotesDialog(context, link),
+        onCopyUrl: () {
+          Clipboard.setData(ClipboardData(text: link.url));
+          _showSnackBar('URL copied to clipboard');
+        },
+        onShare: () async {
+          try {
+            await Share.share(
+              '${link.title}\n${link.url}',
+              subject: link.title != null && link.title!.isNotEmpty
+                  ? link.title!
+                  : 'Shared Link',
+            );
+          } catch (e) {
+            _showSnackBar('Error sharing link: $e');
+          }
+        },
+        onDelete: () async {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: const Text('Delete Link'),
+              content:
+              const Text('Are you sure you want to delete this link?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child:
+                  const Text('Delete', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm == true && link.id != null) {
+            final deletedLink = link;
+            await _dbHelper.deleteLink(link.id!);
+            await loadLinks();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Link deleted'),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                action: SnackBarAction(
+                  label: 'Undo',
+                  textColor: Colors.blue,
+                  onPressed: () async {
+                    await _dbHelper.insertLink(deletedLink);
+                    await loadLinks();
+                  },
+                ),
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   Future<void> _openLink(String url, {bool useDefaultBrowser = false}) async {
     try {
       String formattedUrl = url.trim();
-      if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      if (!formattedUrl.startsWith('http://') &&
+          !formattedUrl.startsWith('https://')) {
         formattedUrl = 'https://$formattedUrl';
       }
 
@@ -380,7 +503,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         }
       } else {
         if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.platformDefault);
+          await launchUrl(uri, mode: LaunchMode.inAppWebView);
         } else {
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -394,86 +517,12 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     }
   }
 
-  void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => LinkOptionsMenu(
-        link: link,
-        onOpenInApp: () => _openLink(link.url, useDefaultBrowser: false),
-        onOpenInBrowser: () => _openLink(link.url, useDefaultBrowser: true),
-        onEditNotes: () => _showEditNotesDialog(context, link),
-        onCopyUrl: () {
-          Clipboard.setData(ClipboardData(text: link.url));
-          _showSnackBar('URL copied to clipboard');
-        },
-        onShare: () async {
-          try {
-            await Share.share(
-              '${link.title}\n${link.url}',
-              subject: link.title != null && link.title!.isNotEmpty ? link.title! : 'Shared Link',
-            );
-          } catch (e) {
-            _showSnackBar('Error sharing link: $e');
-          }
-        },
-        onDelete: () async {
-          final confirm = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Delete Link'),
-              content: const Text('Are you sure you want to delete this link?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Delete', style: TextStyle(color: Colors.white)),
-                ),
-              ],
-            ),
-          );
-
-          if (confirm == true && link.id != null) {
-            final deletedLink = link;
-            await _dbHelper.deleteLink(link.id!);
-            await loadLinks();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Link deleted'),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                action: SnackBarAction(
-                  label: 'Undo',
-                  textColor: Colors.blue,
-                  onPressed: () async {
-                    await _dbHelper.insertLink(deletedLink);
-                    await loadLinks();
-                  },
-                ),
-              ),
-            );
-          }
-        },
-      ),
-    );
-  }
-
   Future<void> _showEditNotesDialog(BuildContext context, LinkModel link) async {
     await showDialog(
       context: context,
       builder: (context) => EditNotesDialog(
         link: link,
         onSave: (updatedLink) async {
-          print('LinksPage: Updating link ID: ${updatedLink.id}, notes: ${updatedLink.notes}');
           await _dbHelper.updateLink(updatedLink);
           await loadLinks();
           _showSnackBar('Notes saved');
