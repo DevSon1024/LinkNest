@@ -1,22 +1,20 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models/link_model.dart';
 import 'pages/home_screen.dart';
-import 'pages/links_page.dart';
-import 'pages/links_folders_page.dart';
 import 'pages/input_page.dart';
+import 'pages/links_folders_page.dart';
+import 'pages/links_page.dart';
 import 'screens/menu_page.dart';
 import 'screens/theme_notifier.dart';
-import 'dart:async';
-import 'services/metadata_service.dart';
 import 'services/database_helper.dart';
-import 'services/background_service.dart';
+import 'services/metadata_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeService();
   runApp(const LinkNestApp());
 }
 
@@ -37,12 +35,6 @@ class LinkNestApp extends StatelessWidget {
             home: const MainScreen(),
             debugShowCheckedModeBanner: false,
             navigatorKey: _navigatorKey,
-            routes: {
-              '/links': (context) => LinksPage(
-                key: GlobalKey<LinksPageState>(),
-                onRefresh: () => (context as Element).findAncestorStateOfType<_MainScreenState>()?.refreshLinks(),
-              ),
-            },
           );
         },
       ),
@@ -62,103 +54,67 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
   final GlobalKey<LinksPageState> _linksPageKey = GlobalKey<LinksPageState>();
-  final GlobalKey<LinksFoldersPageState> _foldersPageKey = GlobalKey<LinksFoldersPageState>();
+  final GlobalKey<LinksFoldersPageState> _foldersPageKey =
+  GlobalKey<LinksFoldersPageState>();
 
-  late StreamSubscription _intentMediaSub;
+  static const _platformChannel =
+  MethodChannel('com.devson.link_nest/share');
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _setupSharingIntent();
+    _platformChannel.setMethodCallHandler(_handleMethodCall);
+    // Important: Check for background-saved links when the app starts
+    _processQuickSavedLinks();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // When the user returns to the app, check if any links were saved in the background
+      _processQuickSavedLinks();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _intentMediaSub.cancel();
     _pageController.dispose();
     super.dispose();
   }
 
-  void _showSnackBar(String message, {bool showViewAction = false}) {
-    final snackBar = SnackBar(
-      content: Text(message),
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      action: showViewAction
-          ? SnackBarAction(
-        label: 'View',
-        textColor: Colors.white,
-        onPressed: () {
-          _navigatorKey.currentState!.pushNamed('/links');
-        },
-      )
-          : null,
-    );
-    ScaffoldMessenger.of(_navigatorKey.currentState!.overlay!.context).showSnackBar(snackBar);
-  }
-
-  void _setupSharingIntent() {
-    print('Setting up sharing intent subscription for media...');
-    _intentMediaSub = ReceiveSharingIntent.instance.getMediaStream().listen(
-          (List<SharedMediaFile> files) {
-        print('Received shared media: ${files.map((f) => f.toMap())}');
-        if (files.isNotEmpty) {
-          _processSharedMedia(files);
+  Future<void> _handleMethodCall(MethodCall call) async {
+    switch (call.method) {
+      case "handleSharedLink":
+        final String? url = call.arguments;
+        if (url != null && url.isNotEmpty) {
+          await _processSharedUrl(url, navigateToLinks: true);
         }
-      },
-      onError: (err) {
-        print("getMediaStream error: $err");
-        _showSnackBar('Error processing shared link: $err');
-      },
-    );
-
-    _checkForInitialSharedMedia();
+        break;
+      case "navigateToLinksPage":
+      // First, process any links that were just saved
+        await _processQuickSavedLinks();
+        // Then, navigate to the links page
+        _onNavItemTapped(1);
+        break;
+    }
   }
 
-  void _checkForInitialSharedMedia() {
-    print('Checking for initial shared media...');
-    ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile>? files) {
-      if (files != null && files.isNotEmpty) {
-        print('Initial shared media received: ${files.map((f) => f.toMap())}');
-        _processSharedMedia(files);
-        ReceiveSharingIntent.instance.reset();
-      } else {
-        print('No initial shared media found');
-      }
-    }).catchError((error) {
-      print('Error getting initial media: $error');
-      _showSnackBar('Error getting initial media: $error');
-    });
-  }
+  Future<void> _processQuickSavedLinks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final urlsToSave = prefs.getStringList('flutter.quick_save_urls');
 
-  Future<void> _processSharedMedia(List<SharedMediaFile> files) async {
+    if (urlsToSave == null || urlsToSave.isEmpty) {
+      return; // No links to process
+    }
+
     final dbHelper = DatabaseHelper();
-    for (final file in files) {
-      final text = file.path; // The shared content is in the 'path' property
-      if (text.isEmpty) {
-        continue;
-      }
-
-      final urls = MetadataService.extractUrlsFromText(text);
-
-      if (urls.isEmpty) {
-        _showSnackBar('No valid URLs found in the shared text');
-        continue;
-      }
-
-      int savedCount = 0;
-      for (final url in urls) {
-        if (await dbHelper.linkExists(url)) {
-          print('Link already exists: $url');
-          continue;
-        }
-
+    int savedCount = 0;
+    for (final url in urlsToSave) {
+      if (!await dbHelper.linkExists(url)) {
         final domain = Uri.tryParse(url)?.host ?? '';
         final newLink = LinkModel(
           url: url,
@@ -166,32 +122,73 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           domain: domain,
           status: MetadataStatus.pending,
         );
-
-        try {
-          await dbHelper.insertLink(newLink);
-          savedCount++;
-        } catch (e) {
-          // This might happen if there's a unique constraint violation,
-          // which is another way of checking if the link exists.
-          print('Error saving link: $e');
-        }
-      }
-
-      if (savedCount > 0) {
-        _showSnackBar('$savedCount link(s) saved! Fetching details...');
-        final service = FlutterBackgroundService();
-        service.invoke('startFetching');
-        refreshLinks();
-      } else {
-        _showSnackBar('No new links were saved from the shared text');
+        await dbHelper.insertLink(newLink);
+        savedCount++;
       }
     }
+
+    await prefs.remove('flutter.quick_save_urls');
+
+    if (savedCount > 0) {
+      _showSnackBar('$savedCount link(s) saved in background!');
+      refreshLinks();
+    }
+  }
+
+  Future<bool> _processSharedUrl(String url, {bool navigateToLinks = false}) async {
+    final dbHelper = DatabaseHelper();
+    int savedCount = 0;
+
+    final urlsInText = MetadataService.extractUrlsFromText(url);
+    if (urlsInText.isEmpty) {
+      _showSnackBar('No valid URL found.');
+      return false;
+    }
+
+    for (final extractedUrl in urlsInText) {
+      if (!await dbHelper.linkExists(extractedUrl)) {
+        final domain = Uri.tryParse(extractedUrl)?.host ?? '';
+        final newLink = LinkModel(
+          url: extractedUrl,
+          createdAt: DateTime.now(),
+          domain: domain,
+          status: MetadataStatus.pending,
+        );
+        await dbHelper.insertLink(newLink);
+        savedCount++;
+      }
+    }
+
+    if (savedCount > 0) {
+      _showSnackBar('$savedCount link(s) saved!');
+      refreshLinks();
+      if (navigateToLinks) _onNavItemTapped(1);
+      return true;
+    } else {
+      _showSnackBar('Link already exists.');
+      if (navigateToLinks) _onNavItemTapped(1);
+      return false;
+    }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   void _onNavItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      _pageController.jumpToPage(index);
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(index);
+      }
       FocusScope.of(context).unfocus();
     });
   }
@@ -201,7 +198,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _foldersPageKey.currentState?.loadFolders();
   }
 
-  Widget _buildNavItem(int index, IconData filledIcon, IconData outlinedIcon, String label) {
+  Widget _buildNavItem(
+      int index, IconData filledIcon, IconData outlinedIcon, String label) {
     final isSelected = _selectedIndex == index;
     return Expanded(
       child: InkWell(
@@ -235,32 +233,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       extendBody: true,
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-            FocusScope.of(context).unfocus();
-          });
-        },
         children: [
           HomeScreen(
-            key: _homeScreenKey,
-            onLinkAdded: () {
-              _linksPageKey.currentState?.loadLinks();
-              _foldersPageKey.currentState?.loadFolders();
-            },
+            onLinkAdded: refreshLinks,
           ),
           LinksPage(
             key: _linksPageKey,
-            onRefresh: () => _linksPageKey.currentState?.loadLinks(),
+            onRefresh: refreshLinks,
           ),
           LinksFoldersPage(
             key: _foldersPageKey,
-            onRefresh: () => _foldersPageKey.currentState?.loadFolders(),
+            onRefresh: refreshLinks,
           ),
           const MenuPage(),
         ],
@@ -279,7 +266,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
               _buildNavItem(1, Icons.link_rounded, Icons.link_outlined, 'Links'),
               const SizedBox(width: 40),
-              _buildNavItem(2, Icons.folder_rounded, Icons.folder_outlined, 'Folders'),
+              _buildNavItem(
+                  2, Icons.folder_rounded, Icons.folder_outlined, 'Folders'),
               _buildNavItem(3, Icons.menu_rounded, Icons.menu_outlined, 'Menu'),
             ],
           ),
@@ -293,10 +281,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             context,
             MaterialPageRoute(
               builder: (context) => InputPage(
-                onLinkAdded: () {
-                  _linksPageKey.currentState?.loadLinks();
-                  _foldersPageKey.currentState?.loadFolders();
-                },
+                onLinkAdded: refreshLinks,
               ),
             ),
           );

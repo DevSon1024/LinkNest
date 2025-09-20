@@ -10,7 +10,6 @@ import 'links_page_widgets/empty_state.dart';
 import 'links_page_widgets/link_options_menu.dart';
 import 'links_page_widgets/edit_notes_dialog.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
 import 'link_details_page.dart';
 
 enum SortOrder { latest, oldest }
@@ -183,13 +182,15 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     }
   }
 
-  void _showSnackBar(String message) {
+  void _showSnackBar(String message, {bool persistent = false}) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Theme.of(context).colorScheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: persistent ? const Duration(days: 1) : const Duration(seconds: 4),
       ),
     );
   }
@@ -209,20 +210,27 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
-              setState(() => _isLoading = true);
+              _showSnackBar('Fetching metadata...', persistent: true);
               try {
-                final service = FlutterBackgroundService();
-                service.invoke('startFetching');
-
-                // Add a small delay to allow the service to start
-                await Future.delayed(const Duration(seconds: 1));
-
                 await MetadataService.clearCache();
+                for (var link in _links) {
+                  final updatedMetadata =
+                  await MetadataService.extractMetadata(link.url);
+                  if (updatedMetadata != null) {
+                    final updatedLink = link.copyWith(
+                      title: updatedMetadata.title,
+                      description: updatedMetadata.description,
+                      imageUrl: updatedMetadata.imageUrl,
+                      domain: updatedMetadata.domain,
+                      status: MetadataStatus.completed,
+                    );
+                    await _dbHelper.updateLink(updatedLink);
+                  }
+                }
                 await loadLinks();
+                _showSnackBar('Metadata fetching complete!');
               } catch (e) {
                 _showSnackBar('Error refreshing: $e');
-              } finally {
-                setState(() => _isLoading = false);
               }
             },
             tooltip: 'Refresh metadata',
@@ -393,6 +401,42 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
   }
 
+  Future<void> _openLink(String url, {bool useDefaultBrowser = false}) async {
+    try {
+      String formattedUrl = url.trim();
+      if (!formattedUrl.startsWith('http://') &&
+          !formattedUrl.startsWith('https://')) {
+        formattedUrl = 'https://$formattedUrl';
+      }
+
+      final uri = Uri.tryParse(formattedUrl);
+      if (uri == null || !uri.hasScheme) {
+        _showSnackBar('Invalid URL: $formattedUrl');
+        return;
+      }
+
+      if (useDefaultBrowser) {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          _showSnackBar('Cannot open link in default browser');
+        }
+      } else {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.inAppWebView);
+        } else {
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            _showSnackBar('Cannot open link');
+          }
+        }
+      }
+    } catch (e) {
+      _showSnackBar('Error opening URL: $e');
+    }
+  }
+
   void _showLinkOptionsMenu(BuildContext context, LinkModel link) {
     showModalBottomSheet(
       context: context,
@@ -481,43 +525,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _openLink(String url, {bool useDefaultBrowser = false}) async {
-    try {
-      String formattedUrl = url.trim();
-      if (!formattedUrl.startsWith('http://') &&
-          !formattedUrl.startsWith('https://')) {
-        formattedUrl = 'https://$formattedUrl';
-      }
-
-      final uri = Uri.tryParse(formattedUrl);
-      if (uri == null || !uri.hasScheme) {
-        _showSnackBar('Invalid URL: $formattedUrl');
-        return;
-      }
-
-      if (useDefaultBrowser) {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          _showSnackBar('Cannot open link in default browser');
-        }
-      } else {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.inAppWebView);
-        } else {
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            _showSnackBar('Cannot open link');
-          }
-        }
-      }
-    } catch (e) {
-      _showSnackBar('Error opening URL: $e');
-    }
-  }
-
-  Future<void> _showEditNotesDialog(BuildContext context, LinkModel link) async {
+  Future<void> _showEditNotesDialog(
+      BuildContext context, LinkModel link) async {
     await showDialog(
       context: context,
       builder: (context) => EditNotesDialog(
