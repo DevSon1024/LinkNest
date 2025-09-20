@@ -60,6 +60,17 @@ android {
     }
 }
 dependencies {
+
+    // Core Android dependencies
+    implementation("androidx.appcompat:appcompat:1.6.1")
+
+    // Material Design (includes AlertDialog)
+    implementation("com.google.android.material:material:1.10.0")
+
+    implementation("androidx.activity:activity-ktx:1.8.1")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
+
+
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") // Desugaring for Java 8+ features
     implementation("androidx.multidex:multidex:2.0.1")// MultiDex support
