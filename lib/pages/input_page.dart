@@ -45,34 +45,42 @@ class InputPageState extends State<InputPage> {
   }
 
   Future<void> _addLink() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) {
-      _showSnackBar('Please enter a URL');
+    final text = _urlController.text.trim();
+    if (text.isEmpty) {
+      _showSnackBar('Please enter a URL or text containing URLs');
       return;
     }
 
-    if (await _dbHelper.linkExists(url)) {
-      _showSnackBar('Link already exists');
+    final urls = MetadataService.extractUrlsFromText(text);
+
+    if (urls.isEmpty) {
+      _showSnackBar('No valid URLs found in the text');
       return;
     }
 
     setState(() => _isLoading = true);
-    await _dbHelper.database; // Ensure database is initialized
-    try {
+    int savedCount = 0;
+    for (final url in urls) {
+      if (await _dbHelper.linkExists(url)) {
+        // Optionally, show a message that the link already exists
+        continue;
+      }
       final linkModel = await MetadataService.extractMetadata(url);
       if (linkModel != null) {
         await _dbHelper.insertLink(linkModel);
-        widget.onLinkAdded?.call();
-        _urlController.clear();
-        await _loadRecentUrls();
-        _showSnackBar('Link saved successfully');
-      } else {
-        _showSnackBar('Failed to extract link information');
+        savedCount++;
       }
-    } catch (e) {
-      _showSnackBar('Error saving link: $e');
-    } finally {
-      setState(() => _isLoading = false);
+    }
+
+    setState(() => _isLoading = false);
+
+    if (savedCount > 0) {
+      widget.onLinkAdded?.call();
+      _urlController.clear();
+      await _loadRecentUrls();
+      _showSnackBar('$savedCount link(s) saved successfully');
+    } else {
+      _showSnackBar('No new links were saved');
     }
   }
 

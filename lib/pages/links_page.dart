@@ -10,6 +10,7 @@ import 'links_page_widgets/empty_state.dart';
 import 'links_page_widgets/link_options_menu.dart';
 import 'links_page_widgets/edit_notes_dialog.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 enum SortOrder { latest, oldest }
 
@@ -207,6 +208,12 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             onPressed: () async {
               setState(() => _isLoading = true);
               try {
+                final service = FlutterBackgroundService();
+                service.invoke('startFetching');
+
+                // Add a small delay to allow the service to start
+                await Future.delayed(const Duration(seconds: 1));
+
                 await MetadataService.clearCache();
                 await loadLinks();
               } catch (e) {

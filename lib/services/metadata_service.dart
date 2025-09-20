@@ -99,6 +99,12 @@ class MetadataService {
     }
   }
 
+  static List<String> extractUrlsFromText(String text) {
+    final urlRegex = RegExp(
+        r'(?:(?:https|http):\/\/|www\.)(?:[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b)(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)');
+    return urlRegex.allMatches(text).map((match) => match.group(0)!).toList();
+  }
+
   static Future<void> clearCache() async {
     _cache.clear();
     final prefs = await SharedPreferences.getInstance();

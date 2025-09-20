@@ -8,6 +8,7 @@ import 'folder_links_page.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 class LinksFoldersPage extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -686,6 +687,11 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
             onPressed: () async {
               setState(() {});
               try {
+                final service = FlutterBackgroundService();
+                service.invoke('startFetching');
+
+                await Future.delayed(const Duration(seconds: 1));
+
                 // Clear cache first
                 await MetadataService.clearCache();
                 // Force metadata refresh by updating links
@@ -706,6 +712,8 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                 }
                 // Refresh the list
                 setState(() {});
+                // Reload the folders
+                await loadFolders();
               } catch (e) {
                 _showSnackBar('Error refreshing: $e');
               }

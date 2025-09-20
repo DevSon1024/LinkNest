@@ -137,55 +137,53 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     });
   }
 
-  String _normalizeUrl(String url) {
-    try {
-      final uri = Uri.parse(url.trim());
-      final scheme = uri.scheme.toLowerCase() == 'http' ? 'https' : uri.scheme;
-      final path = uri.path.endsWith('/') ? uri.path.substring(0, uri.path.length - 1) : uri.path;
-      return Uri(scheme: scheme, host: uri.host.toLowerCase(), path: path, query: uri.query).toString();
-    } catch (e) {
-      return url.trim().toLowerCase();
-    }
-  }
-
   Future<void> _processSharedMedia(List<SharedMediaFile> files) async {
     final dbHelper = DatabaseHelper();
     for (final file in files) {
-      final url = file.path;
-      if (url.isEmpty || !MetadataService.isValidUrl(url)) {
-        print('Invalid URL found in media: ${file.toMap()}');
-        _showSnackBar('Invalid URL: $url');
+      final text = file.path; // The shared content is in the 'path' property
+      if (text.isEmpty) {
         continue;
       }
 
-      final normalizedUrl = _normalizeUrl(url);
-      if (await dbHelper.linkExists(normalizedUrl)) {
-        print('Link already exists: $normalizedUrl');
-        _showSnackBar('Link already exists: $normalizedUrl');
+      final urls = MetadataService.extractUrlsFromText(text);
+
+      if (urls.isEmpty) {
+        _showSnackBar('No valid URLs found in the shared text');
         continue;
       }
 
-      // --- New Instant Save Logic ---
-      final domain = Uri.tryParse(url)?.host ?? '';
-      final newLink = LinkModel(
-        url: url,
-        createdAt: DateTime.now(),
-        domain: domain,
-        status: MetadataStatus.pending, // Start as pending
-      );
+      int savedCount = 0;
+      for (final url in urls) {
+        if (await dbHelper.linkExists(url)) {
+          print('Link already exists: $url');
+          continue;
+        }
 
-      try {
-        await dbHelper.insertLink(newLink);
-        _showSnackBar('Link saved! Fetching details...');
+        final domain = Uri.tryParse(url)?.host ?? '';
+        final newLink = LinkModel(
+          url: url,
+          createdAt: DateTime.now(),
+          domain: domain,
+          status: MetadataStatus.pending,
+        );
 
-        // Trigger background service to start fetching
+        try {
+          await dbHelper.insertLink(newLink);
+          savedCount++;
+        } catch (e) {
+          // This might happen if there's a unique constraint violation,
+          // which is another way of checking if the link exists.
+          print('Error saving link: $e');
+        }
+      }
+
+      if (savedCount > 0) {
+        _showSnackBar('$savedCount link(s) saved! Fetching details...');
         final service = FlutterBackgroundService();
         service.invoke('startFetching');
-
-        // Refresh UI
         refreshLinks();
-      } catch (e) {
-        _showSnackBar('Link already exists!');
+      } else {
+        _showSnackBar('No new links were saved from the shared text');
       }
     }
   }
