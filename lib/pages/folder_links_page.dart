@@ -230,19 +230,6 @@ class FolderLinksPageState extends State<FolderLinksPage>
             },
             tooltip: 'Refresh metadata',
           ),
-          if (_isSelectionMode)
-            IconButton(
-              icon: Icon(
-                _selectedLinks.length == widget.links.length
-                    ? Icons.deselect
-                    : Icons.select_all,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: _selectAllLinks,
-              tooltip: _selectedLinks.length == widget.links.length
-                  ? 'Deselect all'
-                  : 'Select all',
-            ),
           PopupMenuButton<SortOrder>(
             icon: Icon(
               Icons.sort,
@@ -283,84 +270,115 @@ class FolderLinksPageState extends State<FolderLinksPage>
       ),
       body: widget.links.isEmpty
           ? const EmptyState()
-          : RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _sortLinks();
-          });
-        },
-        child: _isGridView
-            ? GridView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: 80),
-          gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.75,
-            crossAxisSpacing: 4,
-            mainAxisSpacing: 4,
-          ),
-          itemCount: widget.links.length,
-          itemBuilder: (context, index) => LinkCard(
-            link: widget.links[index],
-            isGridView: _isGridView,
-            isSelectionMode: _isSelectionMode,
-            isSelected: _selectedLinks.contains(widget.links[index]),
-            onTap: () {
-              if (_isSelectionMode) {
-                _toggleLinkSelection(widget.links[index]);
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        LinkDetailsPage(link: widget.links[index]),
+          : Column(
+        children: [
+          if (_isSelectionMode)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _selectedLinks.length == widget.links.length,
+                    onChanged: (value) => _selectAllLinks(),
                   ),
-                );
-              }
-            },
-            onLongPress: () {
-              if (!_isSelectionMode) {
-                _toggleSelectionMode();
-              }
-              _toggleLinkSelection(widget.links[index]);
-            },
-            onOptionsTap: () =>
-                _showLinkOptionsMenu(context, widget.links[index]),
-          ),
-        )
-            : ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: 100, top: 16),
-          itemCount: widget.links.length,
-          itemBuilder: (context, index) => LinkCard(
-            link: widget.links[index],
-            isGridView: _isGridView,
-            isSelectionMode: _isSelectionMode,
-            isSelected: _selectedLinks.contains(widget.links[index]),
-            onTap: () {
-              if (_isSelectionMode) {
-                _toggleLinkSelection(widget.links[index]);
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        LinkDetailsPage(link: widget.links[index]),
+                  Text(
+                    'Select All',
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
-                );
-              }
-            },
-            onLongPress: () {
-              if (!_isSelectionMode) {
-                _toggleSelectionMode();
-              }
-              _toggleLinkSelection(widget.links[index]);
-            },
-            onOptionsTap: () =>
-                _showLinkOptionsMenu(context, widget.links[index]),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: _toggleSelectionMode,
+                  )
+                ],
+              ),
+            ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  _sortLinks();
+                });
+              },
+              child: _isGridView
+                  ? GridView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 80),
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.75,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 4,
+                ),
+                itemCount: widget.links.length,
+                itemBuilder: (context, index) => LinkCard(
+                  link: widget.links[index],
+                  isGridView: _isGridView,
+                  isSelectionMode: _isSelectionMode,
+                  isSelected:
+                  _selectedLinks.contains(widget.links[index]),
+                  onTap: () {
+                    if (_isSelectionMode) {
+                      _toggleLinkSelection(widget.links[index]);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              LinkDetailsPage(link: widget.links[index]),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () {
+                    if (!_isSelectionMode) {
+                      _toggleSelectionMode();
+                    }
+                    _toggleLinkSelection(widget.links[index]);
+                  },
+                  onOptionsTap: () =>
+                      _showLinkOptionsMenu(context, widget.links[index]),
+                ),
+              )
+                  : ListView.builder(
+                controller: _scrollController,
+                padding:
+                const EdgeInsets.only(bottom: 100, top: 16),
+                itemCount: widget.links.length,
+                itemBuilder: (context, index) => LinkCard(
+                  link: widget.links[index],
+                  isGridView: _isGridView,
+                  isSelectionMode: _isSelectionMode,
+                  isSelected:
+                  _selectedLinks.contains(widget.links[index]),
+                  onTap: () {
+                    if (_isSelectionMode) {
+                      _toggleLinkSelection(widget.links[index]);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              LinkDetailsPage(link: widget.links[index]),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () {
+                    if (!_isSelectionMode) {
+                      _toggleSelectionMode();
+                    }
+                    _toggleLinkSelection(widget.links[index]);
+                  },
+                  onOptionsTap: () =>
+                      _showLinkOptionsMenu(context, widget.links[index]),
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
