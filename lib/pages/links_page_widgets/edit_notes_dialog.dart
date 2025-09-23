@@ -19,44 +19,57 @@ class EditNotesDialog extends StatefulWidget {
 
 class EditNotesDialogState extends State<EditNotesDialog> {
   late TextEditingController _notesController;
+  late TextEditingController _tagController;
+  late List<String> _tags;
 
   @override
   void initState() {
     super.initState();
     _notesController = TextEditingController(text: widget.link.notes ?? '');
-    print('EditNotesDialog: Initial notes: ${widget.link.notes}');
+    _tagController = TextEditingController();
+    _tags = List.from(widget.link.tags);
   }
 
   @override
   void dispose() {
     _notesController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
+  void _addTag() {
+    final newTag = _tagController.text.trim();
+    if (newTag.isNotEmpty && !_tags.contains(newTag)) {
+      setState(() {
+        _tags.add(newTag);
+      });
+    }
+    _tagController.clear();
+  }
+
   Future<bool?> _confirmDeleteNotes() async {
-    print('EditNotesDialog: Showing delete confirmation dialog');
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Notes'),
-        content: const Text('Are you sure you want to delete the notes for this link?'),
+        content: const Text(
+            'Are you sure you want to delete the notes for this link?'),
         actions: [
           TextButton(
             onPressed: () {
-              print('EditNotesDialog: Delete canceled');
               Navigator.pop(context, false);
             },
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              print('EditNotesDialog: Delete confirmed');
               Navigator.pop(context, true);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
@@ -71,13 +84,14 @@ class EditNotesDialogState extends State<EditNotesDialog> {
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Add/Edit Notes'),
+      title: const Text('Add/Edit Notes and Tags'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.link.imageUrl != null && widget.link.imageUrl!.isNotEmpty)
+            if (widget.link.imageUrl != null &&
+                widget.link.imageUrl!.isNotEmpty)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: CachedNetworkImage(
@@ -86,17 +100,22 @@ class EditNotesDialogState extends State<EditNotesDialog> {
                   height: 150,
                   width: double.infinity,
                   placeholder: (context, url) => Shimmer.fromColors(
-                    baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    highlightColor: Theme.of(context).colorScheme.surfaceContainer,
+                    baseColor:
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
+                    highlightColor:
+                    Theme.of(context).colorScheme.surfaceContainer,
                     child: Container(
                       height: 150,
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                     ),
                   ),
                   errorWidget: (context, url, error) => Container(
                     height: 150,
                     color: Theme.of(context).colorScheme.surfaceContainer,
-                    child: Icon(Icons.link, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    child: Icon(Icons.link,
+                        size: 40,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
               ),
@@ -113,9 +132,12 @@ class EditNotesDialogState extends State<EditNotesDialog> {
             const SizedBox(height: 8),
             Text(
               [
-                if (widget.link.description != null && widget.link.description!.isNotEmpty) widget.link.description!,
+                if (widget.link.description != null &&
+                    widget.link.description!.isNotEmpty)
+                  widget.link.description!,
                 'Domain: ${widget.link.domain}',
-                if (widget.link.tags.isNotEmpty) 'Tags: ${widget.link.tags.join(', ')}',
+                if (widget.link.tags.isNotEmpty)
+                  'Tags: ${widget.link.tags.join(', ')}',
               ].join('\n'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -130,8 +152,35 @@ class EditNotesDialogState extends State<EditNotesDialog> {
                 border: const OutlineInputBorder(),
                 hintText: 'Add your notes here...',
                 filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+                fillColor:
+                Theme.of(context).colorScheme.surfaceContainerLowest,
               ),
+            ),
+            const SizedBox(height: 16),
+            Text('Tags', style: Theme.of(context).textTheme.titleLarge),
+            Wrap(
+              spacing: 8.0,
+              children: _tags
+                  .map((tag) => Chip(
+                label: Text(tag),
+                onDeleted: () {
+                  setState(() {
+                    _tags.remove(tag);
+                  });
+                },
+              ))
+                  .toList(),
+            ),
+            TextField(
+              controller: _tagController,
+              decoration: InputDecoration(
+                labelText: 'Add a tag',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: _addTag,
+                ),
+              ),
+              onSubmitted: (_) => _addTag(),
             ),
           ],
         ),
@@ -142,11 +191,8 @@ class EditNotesDialogState extends State<EditNotesDialog> {
             onPressed: () async {
               final confirm = await _confirmDeleteNotes();
               if (confirm == true) {
-                print('EditNotesDialog: Deleting notes for link ID: ${widget.link.id}');
                 final updatedLink = widget.link.copyWith(clearNotes: true);
-                print('EditNotesDialog: Updated link notes after deletion: ${updatedLink.notes}');
                 widget.onSave(updatedLink);
-                print('EditNotesDialog: onSave called with notes: null');
                 Navigator.pop(context);
               }
             },
@@ -157,30 +203,28 @@ class EditNotesDialogState extends State<EditNotesDialog> {
           ),
         TextButton(
           onPressed: () {
-            print('EditNotesDialog: Cancel pressed');
             Navigator.pop(context);
           },
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: () {
-            print('EditNotesDialog: Saving notes: ${_notesController.text}');
             final noteText = _notesController.text.trim();
             final updatedLink = widget.link.copyWith(
               notes: noteText.isEmpty ? null : noteText,
               clearNotes: noteText.isEmpty,
+              tags: _tags,
             );
-            print('EditNotesDialog: Updated link notes: ${updatedLink.notes}');
             widget.onSave(updatedLink);
-            print('EditNotesDialog: onSave called with notes: ${updatedLink.notes}');
             Navigator.pop(context);
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).colorScheme.primary,
             foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
-          child: Text(hasNotes ? 'Update Notes' : 'Save'),
+          child: Text(hasNotes ? 'Update' : 'Save'),
         ),
       ],
     );

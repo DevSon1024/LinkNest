@@ -26,12 +26,14 @@ class LinksPage extends StatefulWidget {
 class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<LinkModel> _links = [];
+  List<LinkModel> _filteredLinks = []; // For search
   final List<LinkModel> _selectedLinks = [];
   bool _isGridView = false;
   bool _isLoading = false;
   bool _isSelectionMode = false;
   late AnimationController _fabAnimationController;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   SortOrder _sortOrder = SortOrder.latest;
 
   @override
@@ -43,12 +45,16 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
     _loadViewPreference();
     loadLinks();
+    _searchController.addListener(() {
+      _filterLinks();
+    });
   }
 
   @override
   void dispose() {
     _fabAnimationController.dispose();
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -70,6 +76,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       final links = await _dbHelper.getAllLinks();
       setState(() {
         _links = links;
+        _filteredLinks = links;
         _sortLinks();
       });
     } catch (e) {
@@ -79,8 +86,21 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     }
   }
 
+  void _filterLinks() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredLinks = _links.where((link) {
+        final titleMatch = link.title?.toLowerCase().contains(query) ?? false;
+        final urlMatch = link.url.toLowerCase().contains(query);
+        final tagMatch =
+        link.tags.any((tag) => tag.toLowerCase().contains(query));
+        return titleMatch || urlMatch || tagMatch;
+      }).toList();
+    });
+  }
+
   void _sortLinks() {
-    _links.sort((a, b) => _sortOrder == SortOrder.latest
+    _filteredLinks.sort((a, b) => _sortOrder == SortOrder.latest
         ? b.createdAt.compareTo(a.createdAt)
         : a.createdAt.compareTo(b.createdAt));
   }
@@ -190,7 +210,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         backgroundColor: Theme.of(context).colorScheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: persistent ? const Duration(days: 1) : const Duration(seconds: 4),
+        duration:
+        persistent ? const Duration(days: 1) : const Duration(seconds: 4),
       ),
     );
   }
@@ -272,16 +293,33 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             tooltip: _isGridView ? 'List view' : 'Grid view',
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by title, URL, or tag...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _links.isEmpty
+          : _filteredLinks.isEmpty
           ? const EmptyState()
           : Column(
         children: [
           if (_isSelectionMode)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 4),
               color: Theme.of(context).colorScheme.surfaceVariant,
               child: Row(
                 children: [
@@ -290,7 +328,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                     onChanged: (value) => _selectAllLinks(),
                   ),
                   Text(
-                    'Select All',
+                    '${_selectedLinks.length} selected',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const Spacer(),
@@ -315,21 +353,24 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                   crossAxisSpacing: 4,
                   mainAxisSpacing: 4,
                 ),
-                itemCount: _links.length,
+                itemCount: _filteredLinks.length,
                 itemBuilder: (context, index) => LinkCard(
-                  link: _links[index],
+                  link: _filteredLinks[index],
                   isGridView: _isGridView,
                   isSelectionMode: _isSelectionMode,
-                  isSelected: _selectedLinks.contains(_links[index]),
+                  isSelected: _selectedLinks
+                      .contains(_filteredLinks[index]),
                   onTap: () {
                     if (_isSelectionMode) {
-                      _toggleLinkSelection(_links[index]);
+                      _toggleLinkSelection(
+                          _filteredLinks[index]);
                     } else {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              LinkDetailsPage(link: _links[index]),
+                              LinkDetailsPage(
+                                  link: _filteredLinks[index]),
                         ),
                       );
                     }
@@ -338,32 +379,34 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                     if (!_isSelectionMode) {
                       _toggleSelectionMode();
                     }
-                    _toggleLinkSelection(_links[index]);
+                    _toggleLinkSelection(_filteredLinks[index]);
                   },
-                  onOptionsTap: () =>
-                      _showLinkOptionsMenu(context, _links[index]),
+                  onOptionsTap: () => _showLinkOptionsMenu(
+                      context, _filteredLinks[index]),
                 ),
               )
                   : ListView.builder(
                 controller: _scrollController,
-                padding:
-                const EdgeInsets.only(bottom: 100, top: 16),
-                itemCount: _links.length,
+                padding: const EdgeInsets.only(
+                    bottom: 100, top: 16),
+                itemCount: _filteredLinks.length,
                 itemBuilder: (context, index) => LinkCard(
-                  link: _links[index],
+                  link: _filteredLinks[index],
                   isGridView: _isGridView,
                   isSelectionMode: _isSelectionMode,
-                  isSelected:
-                  _selectedLinks.contains(_links[index]),
+                  isSelected: _selectedLinks
+                      .contains(_filteredLinks[index]),
                   onTap: () {
                     if (_isSelectionMode) {
-                      _toggleLinkSelection(_links[index]);
+                      _toggleLinkSelection(
+                          _filteredLinks[index]);
                     } else {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              LinkDetailsPage(link: _links[index]),
+                              LinkDetailsPage(
+                                  link: _filteredLinks[index]),
                         ),
                       );
                     }
@@ -372,10 +415,10 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                     if (!_isSelectionMode) {
                       _toggleSelectionMode();
                     }
-                    _toggleLinkSelection(_links[index]);
+                    _toggleLinkSelection(_filteredLinks[index]);
                   },
-                  onOptionsTap: () =>
-                      _showLinkOptionsMenu(context, _links[index]),
+                  onOptionsTap: () => _showLinkOptionsMenu(
+                      context, _filteredLinks[index]),
                 ),
               ),
             ),
@@ -396,8 +439,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                 child: FloatingActionButton(
                   onPressed: _shareSelectedLinks,
                   backgroundColor: Colors.blue,
-                  child:
-                  const Icon(Icons.share, color: Colors.white),
+                  child: const Icon(Icons.share, color: Colors.white),
                 ),
               ),
             ),
@@ -407,8 +449,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               child: FloatingActionButton(
                 onPressed: _deleteSelectedLinks,
                 backgroundColor: Colors.red,
-                child:
-                const Icon(Icons.delete, color: Colors.white),
+                child: const Icon(Icons.delete, color: Colors.white),
               ),
             ),
           ],
@@ -508,8 +549,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
-                  child:
-                  const Text('Delete', style: TextStyle(color: Colors.white)),
+                  child: const Text('Delete',
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),

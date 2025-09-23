@@ -5,14 +5,14 @@ enum MetadataStatus { pending, completed, failed }
 class LinkModel {
   final int? id;
   final String url;
-  final String? title; // Now nullable
-  final String? description; // Now nullable
-  final String? imageUrl; // Now nullable
+  final String? title;
+  final String? description;
+  final String? imageUrl;
   final DateTime createdAt;
   final String domain;
-  final List<String> tags;
+  final List<String> tags; // Modified
   final String? notes;
-  final MetadataStatus status; // New field
+  final MetadataStatus status;
 
   LinkModel({
     this.id,
@@ -22,7 +22,7 @@ class LinkModel {
     this.imageUrl,
     required this.createdAt,
     required this.domain,
-    this.tags = const [],
+    this.tags = const [], // Modified
     this.notes,
     this.status = MetadataStatus.pending,
   });
@@ -36,9 +36,9 @@ class LinkModel {
       'imageUrl': imageUrl,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'domain': domain,
-      'tags': json.encode(tags),
+      'tags': json.encode(tags), // Modified
       'notes': notes,
-      'status': status.name, // Store status as a string
+      'status': status.name,
     };
   }
 
@@ -51,7 +51,9 @@ class LinkModel {
       imageUrl: map['imageUrl'],
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       domain: map['domain'] ?? '',
-      tags: map['tags'] != null ? List<String>.from(json.decode(map['tags'])) : <String>[],
+      tags: map['tags'] != null
+          ? List<String>.from(json.decode(map['tags']))
+          : <String>[], // Modified
       notes: map['notes'],
       status: MetadataStatus.values.firstWhere(
             (e) => e.name == map['status'],
@@ -68,7 +70,7 @@ class LinkModel {
     String? imageUrl,
     DateTime? createdAt,
     String? domain,
-    List<String>? tags,
+    List<String>? tags, // Modified
     String? notes,
     bool clearNotes = false,
     MetadataStatus? status,
@@ -81,7 +83,7 @@ class LinkModel {
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
       domain: domain ?? this.domain,
-      tags: tags ?? this.tags,
+      tags: tags ?? this.tags, // Modified
       notes: clearNotes ? null : (notes ?? this.notes),
       status: status ?? this.status,
     );

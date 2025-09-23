@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'storage_setting.dart';
 import 'version_page.dart';
 import 'display_setting.dart';
+import '../pages/tags_page.dart';
 
 class MenuPage extends StatelessWidget {
   const MenuPage({super.key});
@@ -76,6 +77,17 @@ class MenuPage extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const VersionPage()),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildMenuItem(
+              context,
+              icon: Icons.tag,
+              title: 'Manage Tags',
+              subtitle: 'View, rename, and delete your tags',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TagsPage()),
               ),
             ),
           ],

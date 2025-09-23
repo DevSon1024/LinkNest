@@ -17,17 +17,32 @@ class LinkDetailsPage extends StatefulWidget {
 class _LinkDetailsPageState extends State<LinkDetailsPage> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   late TextEditingController _notesController;
+  late TextEditingController _tagController;
+  late List<String> _tags;
 
   @override
   void initState() {
     super.initState();
     _notesController = TextEditingController(text: widget.link.notes);
+    _tagController = TextEditingController();
+    _tags = List.from(widget.link.tags);
   }
 
   @override
   void dispose() {
     _notesController.dispose();
+    _tagController.dispose();
     super.dispose();
+  }
+
+  void _addTag() {
+    final newTag = _tagController.text.trim();
+    if (newTag.isNotEmpty && !_tags.contains(newTag)) {
+      setState(() {
+        _tags.add(newTag);
+      });
+    }
+    _tagController.clear();
   }
 
   Future<void> _openLink(String url, {bool useDefaultBrowser = false}) async {
@@ -102,18 +117,47 @@ class _LinkDetailsPageState extends State<LinkDetailsPage> {
               maxLines: 4,
             ),
             const SizedBox(height: 16),
+            // Tags section
+            Text('Tags', style: Theme.of(context).textTheme.titleLarge),
+            Wrap(
+              spacing: 8.0,
+              children: _tags
+                  .map((tag) => Chip(
+                label: Text(tag),
+                onDeleted: () {
+                  setState(() {
+                    _tags.remove(tag);
+                  });
+                },
+              ))
+                  .toList(),
+            ),
+            TextField(
+              controller: _tagController,
+              decoration: InputDecoration(
+                labelText: 'Add a tag',
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: _addTag,
+                ),
+              ),
+              onSubmitted: (_) => _addTag(),
+            ),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () async {
-                final updatedLink =
-                widget.link.copyWith(notes: _notesController.text);
+                final updatedLink = widget.link.copyWith(
+                  notes: _notesController.text,
+                  tags: _tags,
+                );
                 await _dbHelper.updateLink(updatedLink);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notes saved!')),
+                    const SnackBar(content: Text('Notes and tags saved!')),
                   );
                 }
               },
-              child: const Text('Save Notes'),
+              child: const Text('Save Notes and Tags'),
             ),
           ],
         ),

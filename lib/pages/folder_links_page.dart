@@ -32,10 +32,12 @@ class FolderLinksPageState extends State<FolderLinksPage>
     with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final List<LinkModel> _selectedLinks = [];
+  List<LinkModel> _filteredLinks = [];
   bool _isGridView = false;
   bool _isSelectionMode = false;
   late AnimationController _fabAnimationController;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   SortOrder _sortOrder = SortOrder.latest;
 
   @override
@@ -46,13 +48,18 @@ class FolderLinksPageState extends State<FolderLinksPage>
       vsync: this,
     );
     _loadViewPreference();
+    _filteredLinks = widget.links;
     _sortLinks();
+    _searchController.addListener(() {
+      _filterLinks();
+    });
   }
 
   @override
   void dispose() {
     _fabAnimationController.dispose();
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -68,9 +75,22 @@ class FolderLinksPageState extends State<FolderLinksPage>
     await prefs.setBool('folder_links_page_view', _isGridView);
   }
 
+  void _filterLinks() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredLinks = widget.links.where((link) {
+        final titleMatch = link.title?.toLowerCase().contains(query) ?? false;
+        final urlMatch = link.url.toLowerCase().contains(query);
+        final tagMatch =
+        link.tags.any((tag) => tag.toLowerCase().contains(query));
+        return titleMatch || urlMatch || tagMatch;
+      }).toList();
+    });
+  }
+
   void _sortLinks() {
     setState(() {
-      widget.links.sort((a, b) => _sortOrder == SortOrder.latest
+      _filteredLinks.sort((a, b) => _sortOrder == SortOrder.latest
           ? b.createdAt.compareTo(a.createdAt)
           : a.createdAt.compareTo(b.createdAt));
     });
@@ -92,11 +112,11 @@ class FolderLinksPageState extends State<FolderLinksPage>
 
   void _selectAllLinks() {
     setState(() {
-      if (_selectedLinks.length == widget.links.length) {
+      if (_selectedLinks.length == _filteredLinks.length) {
         _selectedLinks.clear();
       } else {
         _selectedLinks.clear();
-        _selectedLinks.addAll(widget.links);
+        _selectedLinks.addAll(_filteredLinks);
         if (!_isSelectionMode) {
           _toggleSelectionMode();
         }
@@ -267,23 +287,41 @@ class FolderLinksPageState extends State<FolderLinksPage>
             tooltip: _isGridView ? 'List view' : 'Grid view',
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by title, URL, or tag...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20.0),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-      body: widget.links.isEmpty
+      body: _filteredLinks.isEmpty
           ? const EmptyState()
           : Column(
         children: [
           if (_isSelectionMode)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               color: Theme.of(context).colorScheme.surfaceVariant,
               child: Row(
                 children: [
                   Checkbox(
-                    value: _selectedLinks.length == widget.links.length,
+                    value:
+                    _selectedLinks.length == _filteredLinks.length,
                     onChanged: (value) => _selectAllLinks(),
                   ),
                   Text(
-                    'Select All',
+                    '${_selectedLinks.length} selected',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   const Spacer(),
@@ -312,22 +350,22 @@ class FolderLinksPageState extends State<FolderLinksPage>
                   crossAxisSpacing: 4,
                   mainAxisSpacing: 4,
                 ),
-                itemCount: widget.links.length,
+                itemCount: _filteredLinks.length,
                 itemBuilder: (context, index) => LinkCard(
-                  link: widget.links[index],
+                  link: _filteredLinks[index],
                   isGridView: _isGridView,
                   isSelectionMode: _isSelectionMode,
-                  isSelected:
-                  _selectedLinks.contains(widget.links[index]),
+                  isSelected: _selectedLinks
+                      .contains(_filteredLinks[index]),
                   onTap: () {
                     if (_isSelectionMode) {
-                      _toggleLinkSelection(widget.links[index]);
+                      _toggleLinkSelection(_filteredLinks[index]);
                     } else {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              LinkDetailsPage(link: widget.links[index]),
+                          builder: (context) => LinkDetailsPage(
+                              link: _filteredLinks[index]),
                         ),
                       );
                     }
@@ -336,32 +374,32 @@ class FolderLinksPageState extends State<FolderLinksPage>
                     if (!_isSelectionMode) {
                       _toggleSelectionMode();
                     }
-                    _toggleLinkSelection(widget.links[index]);
+                    _toggleLinkSelection(_filteredLinks[index]);
                   },
-                  onOptionsTap: () =>
-                      _showLinkOptionsMenu(context, widget.links[index]),
+                  onOptionsTap: () => _showLinkOptionsMenu(
+                      context, _filteredLinks[index]),
                 ),
               )
                   : ListView.builder(
                 controller: _scrollController,
                 padding:
                 const EdgeInsets.only(bottom: 100, top: 16),
-                itemCount: widget.links.length,
+                itemCount: _filteredLinks.length,
                 itemBuilder: (context, index) => LinkCard(
-                  link: widget.links[index],
+                  link: _filteredLinks[index],
                   isGridView: _isGridView,
                   isSelectionMode: _isSelectionMode,
-                  isSelected:
-                  _selectedLinks.contains(widget.links[index]),
+                  isSelected: _selectedLinks
+                      .contains(_filteredLinks[index]),
                   onTap: () {
                     if (_isSelectionMode) {
-                      _toggleLinkSelection(widget.links[index]);
+                      _toggleLinkSelection(_filteredLinks[index]);
                     } else {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              LinkDetailsPage(link: widget.links[index]),
+                          builder: (context) => LinkDetailsPage(
+                              link: _filteredLinks[index]),
                         ),
                       );
                     }
@@ -370,10 +408,10 @@ class FolderLinksPageState extends State<FolderLinksPage>
                     if (!_isSelectionMode) {
                       _toggleSelectionMode();
                     }
-                    _toggleLinkSelection(widget.links[index]);
+                    _toggleLinkSelection(_filteredLinks[index]);
                   },
-                  onOptionsTap: () =>
-                      _showLinkOptionsMenu(context, widget.links[index]),
+                  onOptionsTap: () => _showLinkOptionsMenu(
+                      context, _filteredLinks[index]),
                 ),
               ),
             ),
@@ -394,8 +432,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
                 child: FloatingActionButton(
                   onPressed: _shareSelectedLinks,
                   backgroundColor: Colors.blue,
-                  child:
-                  const Icon(Icons.share, color: Colors.white),
+                  child: const Icon(Icons.share, color: Colors.white),
                 ),
               ),
             ),
@@ -405,8 +442,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
               child: FloatingActionButton(
                 onPressed: _deleteSelectedLinks,
                 backgroundColor: Colors.red,
-                child:
-                const Icon(Icons.delete, color: Colors.white),
+                child: const Icon(Icons.delete, color: Colors.white),
               ),
             ),
           ],
@@ -506,8 +542,8 @@ class FolderLinksPageState extends State<FolderLinksPage>
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
-                  child:
-                  const Text('Delete', style: TextStyle(color: Colors.white)),
+                  child: const Text('Delete',
+                      style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
