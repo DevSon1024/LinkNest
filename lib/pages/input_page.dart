@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
 import 'package:flutter/services.dart';
+import '../models/link_model.dart';
 
 class InputPage extends StatefulWidget {
   final VoidCallback? onLinkAdded;
@@ -65,11 +66,15 @@ class InputPageState extends State<InputPage> {
         // Optionally, show a message that the link already exists
         continue;
       }
-      final linkModel = await MetadataService.extractMetadata(url);
-      if (linkModel != null) {
-        await _dbHelper.insertLink(linkModel);
-        savedCount++;
-      }
+      final domain = Uri.tryParse(url)?.host ?? '';
+      final newLink = LinkModel(
+        url: url,
+        createdAt: DateTime.now(),
+        domain: domain,
+        status: MetadataStatus.pending,
+      );
+      await _dbHelper.insertLink(newLink);
+      savedCount++;
     }
 
     setState(() => _isLoading = false);

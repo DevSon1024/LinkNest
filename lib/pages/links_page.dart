@@ -235,19 +235,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             },
             tooltip: 'Refresh metadata',
           ),
-          if (_isSelectionMode)
-            IconButton(
-              icon: Icon(
-                _selectedLinks.length == _links.length
-                    ? Icons.deselect
-                    : Icons.select_all,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              onPressed: _selectAllLinks,
-              tooltip: _selectedLinks.length == _links.length
-                  ? 'Deselect all'
-                  : 'Select all',
-            ),
+
           PopupMenuButton<SortOrder>(
             icon: Icon(
               Icons.sort,
@@ -284,6 +272,19 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             },
             tooltip: _isGridView ? 'List view' : 'Grid view',
           ),
+          if (_isSelectionMode)
+            IconButton(
+              icon: Icon(
+                _selectedLinks.length == _links.length
+                    ? Icons.deselect
+                    : Icons.select_all,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              onPressed: _selectAllLinks,
+              tooltip: _selectedLinks.length == _links.length
+                  ? 'Deselect all'
+                  : 'Select all',
+            ),
         ],
       ),
       body: _isLoading
