@@ -2,92 +2,51 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_gravity="center"
+    android:layout_gravity="bottom"
     android:orientation="vertical"
     android:background="@drawable/dialog_background"
-    android:padding="24dp"
-    android:layout_margin="16dp">
+    android:padding="24dp">
 
-    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:gravity="center_vertical">
 
         <ImageView
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
             android:src="@mipmap/ic_launcher"
             android:layout_marginEnd="12dp"/>
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/titleTextView"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="LinkNest"
-                android:textStyle="bold"
-                android:textSize="18sp"
-                android:textColor="?android:attr/textColorPrimary" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Save link to your collection"
-                android:textSize="14sp"
-                android:textColor="?android:attr/textColorSecondary" />
-
-        </LinearLayout>
-
+            android:text="Save to LinkNest"
+            android:textAppearance="@style/TextAppearance.AppCompat.Title"
+            android:textColor="?android:attr/textColorPrimary" />
     </LinearLayout>
 
-    <!-- URL Display -->
     <TextView
         android:id="@+id/urlTextView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:layout_marginBottom="24dp"
         android:text="https://example.com/very/long/url/to/be/displayed/here"
         android:maxLines="3"
         android:ellipsize="end"
         android:background="@drawable/url_background"
-        android:padding="16dp"
-        android:textSize="14sp"
-        android:textColor="?android:attr/textColorPrimary" />
+        android:padding="12dp"
+        android:textColor="?android:attr/textColorSecondary" />
 
-    <!-- Action Buttons -->
-    <LinearLayout
+    <Button
+        android:id="@+id/saveButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="end">
-
-        <Button
-            android:id="@+id/cancelButton"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Cancel"
-            android:textColor="?android:attr/textColorSecondary"
-            android:layout_marginEnd="8dp"
-            android:minWidth="88dp" />
-
-        <Button
-            android:id="@+id/saveButton"
-            style="?android:attr/buttonBarButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Save Link"
-            android:textColor="?android:attr/colorAccent"
-            android:textStyle="bold"
-            android:minWidth="88dp" />
-
-    </LinearLayout>
+        android:text="Save Link"
+        style="@style/Widget.AppCompat.Button.Colored"
+        android:padding="12dp"/>
 
 </LinearLayout>

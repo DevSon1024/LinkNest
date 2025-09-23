@@ -73,13 +73,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final service = FlutterBackgroundService();
     service.startService();
     service.invoke('startFetching');
+
+    _processQuickSavedLinks();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      refreshLinks();
+      _processQuickSavedLinks();
     }
   }
 
@@ -99,8 +101,41 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         }
         break;
       case "navigateToLinksPage":
+        await _processQuickSavedLinks();
         _onNavItemTapped(1);
         break;
+    }
+  }
+
+  Future<void> _processQuickSavedLinks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final urlsToSave = prefs.getStringList('flutter.quick_save_urls');
+
+    if (urlsToSave == null || urlsToSave.isEmpty) {
+      return;
+    }
+
+    final dbHelper = DatabaseHelper();
+    int savedCount = 0;
+    for (final url in urlsToSave) {
+      if (!await dbHelper.linkExists(url)) {
+        final domain = Uri.tryParse(url)?.host ?? '';
+        final newLink = LinkModel(
+          url: url,
+          createdAt: DateTime.now(),
+          domain: domain,
+          status: MetadataStatus.pending,
+        );
+        await dbHelper.insertLink(newLink);
+        savedCount++;
+      }
+    }
+
+    await prefs.remove('flutter.quick_save_urls');
+
+    if (savedCount > 0) {
+      _showSnackBar('$savedCount link(s) saved in background!');
+      refreshLinks();
     }
   }
 
