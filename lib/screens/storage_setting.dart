@@ -469,10 +469,11 @@ class StorageSettingState extends State<StorageSetting> {
     Color? iconColor,
     bool isLoading = false,
   }) {
+    final theme = Theme.of(context);
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+      surfaceTintColor: theme.colorScheme.surfaceTint,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: isLoading ? null : onTap,
@@ -508,10 +509,10 @@ class StorageSettingState extends State<StorageSetting> {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isLoading
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            ? theme.colorScheme.onSurfaceVariant
                             : null,
                       ),
                       maxLines: 1,
@@ -520,7 +521,7 @@ class StorageSettingState extends State<StorageSetting> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontSize: 12,
                       ),
                       maxLines: 2,
@@ -532,7 +533,7 @@ class StorageSettingState extends State<StorageSetting> {
               if (!isLoading)
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
             ],
           ),
@@ -569,33 +570,29 @@ class StorageSettingState extends State<StorageSetting> {
         child: Column(
           children: [
             if (!_hasStoragePermission)
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_rounded,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Storage permission required for backup/restore operations on older Android versions',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontSize: 12,
-                          ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Storage permission required for backup/restore operations on older Android versions',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 12,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             if (!_hasStoragePermission) const SizedBox(height: 16),

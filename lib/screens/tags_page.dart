@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
 
@@ -11,6 +12,7 @@ class TagsPage extends StatefulWidget {
 class _TagsPageState extends State<TagsPage> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   Map<String, int> _tags = {};
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -19,6 +21,7 @@ class _TagsPageState extends State<TagsPage> {
   }
 
   Future<void> _loadTags() async {
+    setState(() => _isLoading = true);
     final links = await _dbHelper.getAllLinks();
     final tagCounts = <String, int>{};
     for (var link in links) {
@@ -26,9 +29,12 @@ class _TagsPageState extends State<TagsPage> {
         tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
       }
     }
-    setState(() {
-      _tags = tagCounts;
-    });
+    if (mounted) {
+      setState(() {
+        _tags = tagCounts;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _renameTag(String oldTag, String newTag) async {
@@ -41,51 +47,42 @@ class _TagsPageState extends State<TagsPage> {
         await _dbHelper.updateLink(link.copyWith(tags: newTags));
       }
     }
-    _loadTags();
+    await _loadTags();
   }
 
   Future<void> _deleteTag(String tag) async {
-    final links = await _dbHelper.getAllLinks();
-    for (var link in links) {
-      if (link.tags.contains(tag)) {
-        final newTags = link.tags..remove(tag);
-        await _dbHelper.updateLink(link.copyWith(tags: newTags));
-      }
-    }
-    _loadTags();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Tags'),
-      ),
-      body: ListView.builder(
-        itemCount: _tags.length,
-        itemBuilder: (context, index) {
-          final tagName = _tags.keys.elementAt(index);
-          final count = _tags[tagName];
-          return ListTile(
-            title: Text(tagName),
-            subtitle: Text('$count links'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () => _showRenameDialog(tagName),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () => _deleteTag(tagName),
-                ),
-              ],
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Tag'),
+        content: Text('Are you sure you want to delete the tag "$tag"? This will remove it from all associated links.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
-          );
-        },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
+
+    if (confirm == true) {
+      final links = await _dbHelper.getAllLinks();
+      for (var link in links) {
+        if (link.tags.contains(tag)) {
+          final newTags = link.tags..remove(tag);
+          await _dbHelper.updateLink(link.copyWith(tags: newTags));
+        }
+      }
+      await _loadTags();
+    }
   }
 
   void _showRenameDialog(String oldTag) {
@@ -95,7 +92,13 @@ class _TagsPageState extends State<TagsPage> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Rename Tag'),
-          content: TextField(controller: controller),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'New tag name',
+            ),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -103,7 +106,7 @@ class _TagsPageState extends State<TagsPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                _renameTag(oldTag, controller.text);
+                _renameTag(oldTag, controller.text.trim());
                 Navigator.pop(context);
               },
               child: const Text('Rename'),
@@ -111,6 +114,103 @@ class _TagsPageState extends State<TagsPage> {
           ],
         );
       },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final sortedTags = _tags.keys.toList()..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Manage Tags'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _tags.isEmpty
+          ? Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              CupertinoIcons.tags_solid,
+              size: 80,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Tags Found',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add tags to your links to see them here.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      )
+          : RefreshIndicator(
+        onRefresh: _loadTags,
+        child: GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 2.5,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: sortedTags.length,
+          itemBuilder: (context, index) {
+            final tagName = sortedTags[index];
+            final count = _tags[tagName];
+            return Card(
+              child: InkWell(
+                onTap: () => _showRenameDialog(tagName),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              tagName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () => _deleteTag(tagName),
+                            customBorder: const CircleBorder(),
+                            child: const Icon(CupertinoIcons.xmark, size: 16),
+                          )
+                        ],
+                      ),
+                      Text(
+                        '$count link${count == 1 ? '' : 's'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

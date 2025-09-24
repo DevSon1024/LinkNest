@@ -26,10 +26,11 @@ class MenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Menu'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
       ),
       body: ListView(
@@ -59,6 +60,17 @@ class MenuPage extends StatelessWidget {
           const SizedBox(height: 12),
           _buildMenuItem(
             context,
+            icon: CupertinoIcons.tag,
+            title: 'Manage Tags',
+            subtitle: 'View, rename, and delete your tags',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const TagsPage()),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildMenuItem(
+            context,
             icon: CupertinoIcons.shield_lefthalf_fill,
             title: 'Privacy Policy',
             subtitle: 'View app privacy policy and terms',
@@ -75,17 +87,6 @@ class MenuPage extends StatelessWidget {
               MaterialPageRoute(builder: (context) => const VersionPage()),
             ),
           ),
-          const SizedBox(height: 12),
-          _buildMenuItem(
-            context,
-            icon: CupertinoIcons.tag,
-            title: 'Manage Tags',
-            subtitle: 'View, rename, and delete your tags',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const TagsPage()),
-            ),
-          ),
         ],
       ),
     );
@@ -99,26 +100,46 @@ class MenuPage extends StatelessWidget {
         required VoidCallback onTap,
       }) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        leading: Icon(icon, size: 24, color: theme.colorScheme.primary),
-        title: Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        trailing: const Icon(CupertinoIcons.chevron_forward, size: 20),
+    return Material(
+      color: theme.colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.dividerColor, width: 0.5),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 24, color: theme.colorScheme.primary),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(CupertinoIcons.chevron_forward, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

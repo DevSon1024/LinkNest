@@ -128,7 +128,7 @@ class InputPageState extends State<InputPage> {
           overflow: TextOverflow.ellipsis,
         ),
         trailing: IconButton(
-          icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 20),
+          icon: const Icon(CupertinoIcons.doc_on_clipboard_fill, size: 20),
           onPressed: () => _copyUrl(url),
           tooltip: 'Copy URL',
         ),

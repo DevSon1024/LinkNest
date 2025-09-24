@@ -37,86 +37,89 @@ class DisplaySetting extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              surfaceTintColor: theme.colorScheme.surfaceTint,
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: theme.colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Column(
                 children: [
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: theme.colorScheme.surfaceContainer,
-                      child: Icon(
-                        Icons.brightness_auto_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 24,
-                      ),
-                    ),
-                    title: Text(
-                      'Use System Theme',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Follow device light/dark mode',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: Switch(
-                      value: themeNotifier.themeMode == ThemeMode.system,
-                      onChanged: (value) {
-                        themeNotifier.setTheme(value ? ThemeMode.system : ThemeMode.light);
-                      },
-                      activeColor: theme.colorScheme.primary,
-                    ),
+                  _buildThemeOption(
+                    context: context,
+                    icon: Icons.brightness_auto_rounded,
+                    title: 'Use System Theme',
+                    subtitle: 'Follow device light/dark mode',
+                    value: themeNotifier.themeMode == ThemeMode.system,
+                    onChanged: (value) {
+                      themeNotifier.setTheme(value ? ThemeMode.system : ThemeMode.light);
+                    },
                   ),
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: CircleAvatar(
-                      radius: 24,
-                      backgroundColor: theme.colorScheme.surfaceContainer,
-                      child: Icon(
-                        Icons.brightness_6_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 24,
-                      ),
-                    ),
-                    title: Text(
-                      'Dark Mode',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: themeNotifier.themeMode == ThemeMode.system
-                            ? theme.colorScheme.onSurface.withOpacity(0.5)
-                            : theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Toggle between light and dark theme',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: themeNotifier.themeMode == ThemeMode.system
-                            ? theme.colorScheme.onSurfaceVariant.withOpacity(0.5)
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: Switch(
-                      value: themeNotifier.themeMode == ThemeMode.dark,
-                      onChanged: themeNotifier.themeMode == ThemeMode.system
-                          ? null
-                          : (value) {
-                        themeNotifier.setTheme(value ? ThemeMode.dark : ThemeMode.light);
-                      },
-                      activeColor: theme.colorScheme.primary,
-                    ),
+                  const Divider(height: 1),
+                  _buildThemeOption(
+                    context: context,
+                    icon: Icons.brightness_6_rounded,
+                    title: 'Dark Mode',
+                    subtitle: 'Toggle between light and dark theme',
+                    value: themeNotifier.themeMode == ThemeMode.dark,
+                    onChanged: themeNotifier.themeMode == ThemeMode.system
+                        ? null
+                        : (value) {
+                      themeNotifier.setTheme(value ? ThemeMode.dark : ThemeMode.light);
+                    },
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Icon(
+          icon,
+          color: theme.colorScheme.onPrimaryContainer,
+          size: 24,
+        ),
+      ),
+      title: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: onChanged == null ? theme.disabledColor : null,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: onChanged == null ? theme.disabledColor : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: theme.colorScheme.primary,
       ),
     );
   }
