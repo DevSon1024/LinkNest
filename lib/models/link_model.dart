@@ -10,9 +10,10 @@ class LinkModel {
   final String? imageUrl;
   final DateTime createdAt;
   final String domain;
-  final List<String> tags; // Modified
+  final List<String> tags;
   final String? notes;
   final MetadataStatus status;
+  final bool isFavorite;
 
   LinkModel({
     this.id,
@@ -25,6 +26,7 @@ class LinkModel {
     this.tags = const [], // Modified
     this.notes,
     this.status = MetadataStatus.pending,
+    this.isFavorite = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -36,9 +38,10 @@ class LinkModel {
       'imageUrl': imageUrl,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'domain': domain,
-      'tags': json.encode(tags), // Modified
+      'tags': json.encode(tags),
       'notes': notes,
       'status': status.name,
+      'isFavorite': isFavorite ? 1 : 0,
     };
   }
 
@@ -59,6 +62,7 @@ class LinkModel {
             (e) => e.name == map['status'],
         orElse: () => MetadataStatus.pending,
       ),
+      isFavorite: map['isFavorite'] == 1,
     );
   }
 
@@ -74,6 +78,7 @@ class LinkModel {
     String? notes,
     bool clearNotes = false,
     MetadataStatus? status,
+    bool? isFavorite,
   }) {
     return LinkModel(
       id: id ?? this.id,
@@ -86,6 +91,7 @@ class LinkModel {
       tags: tags ?? this.tags, // Modified
       notes: clearNotes ? null : (notes ?? this.notes),
       status: status ?? this.status,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 }

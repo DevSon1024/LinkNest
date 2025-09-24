@@ -9,6 +9,7 @@ import 'pages/input_page.dart';
 import 'pages/links_folders_page.dart';
 import 'pages/links_page.dart';
 import 'pages/menu_page.dart';
+import 'pages/favorites_page.dart';
 import 'screens/theme_notifier.dart';
 import 'services/database_helper.dart';
 import 'services/metadata_service.dart';
@@ -67,6 +68,8 @@ class _MainScreenState extends State<MainScreen>
   final GlobalKey<LinksPageState> _linksPageKey = GlobalKey<LinksPageState>();
   final GlobalKey<LinksFoldersPageState> _foldersPageKey =
   GlobalKey<LinksFoldersPageState>();
+  final GlobalKey<FavoritesPageState> _favoritesPageKey =
+  GlobalKey<FavoritesPageState>();
 
   static const _platformChannel =
   MethodChannel('com.devson.link_nest/share');
@@ -313,6 +316,7 @@ class _MainScreenState extends State<MainScreen>
   void refreshLinks() {
     _linksPageKey.currentState?.loadLinks();
     _foldersPageKey.currentState?.loadFolders();
+    _favoritesPageKey.currentState?.loadLinks();
   }
 
   Widget _buildModernNavItem(int index) {
@@ -403,6 +407,7 @@ class _MainScreenState extends State<MainScreen>
               ],
             ),
             child: FloatingActionButton(
+              heroTag: 'main_fab',
               backgroundColor: Colors.transparent,
               foregroundColor: theme.colorScheme.onPrimary,
               elevation: 0,

@@ -8,7 +8,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static Database? _database;
-  static const int _databaseVersion = 4; // Incremented version
+  static const int _databaseVersion = 5; // Incremented version
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -38,7 +38,8 @@ class DatabaseHelper {
         domain TEXT NOT NULL,
         tags TEXT,
         notes TEXT,
-        status TEXT NOT NULL DEFAULT "pending"
+        status TEXT NOT NULL DEFAULT "pending",
+        isFavorite INTEGER NOT NULL DEFAULT 0
       )
     ''');
   }
@@ -60,6 +61,9 @@ class DatabaseHelper {
       if (!columnNames.contains('tags')) {
         await db.execute('ALTER TABLE links ADD COLUMN tags TEXT');
       }
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE links ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0');
     }
   }
 
@@ -89,6 +93,17 @@ class DatabaseHelper {
       orderBy: 'createdAt DESC',
     );
     print('DatabaseHelper: Fetched ${maps.length} links');
+    return List.generate(maps.length, (i) => LinkModel.fromMap(maps[i]));
+  }
+
+  Future<List<LinkModel>> getFavoriteLinks() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'links',
+      where: 'isFavorite = ?',
+      whereArgs: [1],
+      orderBy: 'createdAt DESC',
+    );
     return List.generate(maps.length, (i) => LinkModel.fromMap(maps[i]));
   }
 
@@ -159,5 +174,15 @@ class DatabaseHelper {
     );
     print('DatabaseHelper: Link exists: ${maps.isNotEmpty}');
     return maps.isNotEmpty;
+  }
+
+  Future<int> toggleFavoriteStatus(int id, bool isFavorite) async {
+    final db = await database;
+    return await db.update(
+      'links',
+      {'isFavorite': isFavorite ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

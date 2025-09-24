@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
+import 'favorites_page.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onLinkAdded;
@@ -106,6 +107,8 @@ class HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 24),
               _buildInfoCard(context),
+              const SizedBox(height: 16),
+              _buildFavoritesCard(context),
             ],
           ),
         ),
@@ -148,6 +151,45 @@ class HomeScreenState extends State<HomeScreen> {
                 'Tap the + button below to add links manually',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFavoritesCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const FavoritesPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.star_rounded,
+              color: theme.colorScheme.onSecondaryContainer,
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'View your favorite links',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSecondaryContainer,
                   fontWeight: FontWeight.w500,
                 ),
               ),

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/cupertino.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
@@ -11,30 +10,28 @@ import 'links_page_widgets/link_card.dart';
 import 'links_page_widgets/empty_state.dart';
 import 'links_page_widgets/link_options_menu.dart';
 import 'links_page_widgets/edit_notes_dialog.dart';
+import 'package:flutter/services.dart';
 import 'link_details_page.dart';
 
 enum SortOrder { latest, oldest }
+enum ViewMode { list, grid }
 
-class FolderLinksPage extends StatefulWidget {
-  final String folderName;
-  final List<LinkModel> links;
+class FavoritesPage extends StatefulWidget {
+  final VoidCallback? onRefresh;
 
-  const FolderLinksPage({
-    super.key,
-    required this.folderName,
-    required this.links,
-  });
+  const FavoritesPage({super.key, this.onRefresh});
 
   @override
-  FolderLinksPageState createState() => FolderLinksPageState();
+  FavoritesPageState createState() => FavoritesPageState();
 }
 
-class FolderLinksPageState extends State<FolderLinksPage>
-    with TickerProviderStateMixin {
+class FavoritesPageState extends State<FavoritesPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  final List<LinkModel> _selectedLinks = [];
+  List<LinkModel> _links = [];
   List<LinkModel> _filteredLinks = [];
-  bool _isGridView = false;
+  final List<LinkModel> _selectedLinks = [];
+  ViewMode _viewMode = ViewMode.list;
+  bool _isLoading = false;
   bool _isSelectionMode = false;
   bool _isSearchVisible = false;
   late AnimationController _fabAnimationController;
@@ -55,8 +52,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
       vsync: this,
     );
     _loadViewPreference();
-    _filteredLinks = widget.links;
-    _sortLinks();
+    loadLinks();
     _searchController.addListener(() {
       _filterLinks();
     });
@@ -74,28 +70,45 @@ class FolderLinksPageState extends State<FolderLinksPage>
   Future<void> _loadViewPreference() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _isGridView = prefs.getBool('folder_links_page_view') ?? false;
+      _viewMode = prefs.getBool('links_page_view') ?? false
+          ? ViewMode.grid
+          : ViewMode.list;
     });
   }
 
   Future<void> _saveViewPreference() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('folder_links_page_view', _isGridView);
+    await prefs.setBool('links_page_view', _viewMode == ViewMode.grid);
+  }
+
+  Future<void> loadLinks() async {
+    setState(() => _isLoading = true);
+    try {
+      final links = await _dbHelper.getFavoriteLinks();
+      setState(() {
+        _links = links;
+        _filteredLinks = links;
+        _sortLinks();
+      });
+    } catch (e) {
+      _showSnackBar('Error loading links: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _filterLinks() {
     final query = _searchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        _filteredLinks = widget.links;
+        _filteredLinks = _links;
       } else {
-        _filteredLinks = widget.links.where((link) {
+        _filteredLinks = _links.where((link) {
           final titleMatch = link.title?.toLowerCase().contains(query) ?? false;
           final urlMatch = link.url.toLowerCase().contains(query);
           final domainMatch = link.domain?.toLowerCase().contains(query) ?? false;
           final tagMatch = link.tags.any((tag) => tag.toLowerCase().contains(query));
-          final notesMatch = link.notes?.toLowerCase().contains(query) ?? false;
-          return titleMatch || urlMatch || domainMatch || tagMatch || notesMatch;
+          return titleMatch || urlMatch || domainMatch || tagMatch;
         }).toList();
       }
       _sortLinks();
@@ -107,7 +120,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
       _isSearchVisible = !_isSearchVisible;
       if (!_isSearchVisible) {
         _searchController.clear();
-        _filteredLinks = widget.links;
+        _filteredLinks = _links;
         _sortLinks();
         _searchAnimationController.reverse();
       } else {
@@ -117,11 +130,9 @@ class FolderLinksPageState extends State<FolderLinksPage>
   }
 
   void _sortLinks() {
-    setState(() {
-      _filteredLinks.sort((a, b) => _sortOrder == SortOrder.latest
-          ? b.createdAt.compareTo(a.createdAt)
-          : a.createdAt.compareTo(b.createdAt));
-    });
+    _filteredLinks.sort((a, b) => _sortOrder == SortOrder.latest
+        ? b.createdAt.compareTo(a.createdAt)
+        : a.createdAt.compareTo(b.createdAt));
   }
 
   void _toggleSelectionMode() {
@@ -162,7 +173,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
     try {
       await Share.share(
         linksText,
-        subject: 'Shared ${_selectedLinks.length} Links from ${widget.folderName}',
+        subject: 'Shared ${_selectedLinks.length} Links',
       );
     } catch (e) {
       _showSnackBar('Error sharing links: $e');
@@ -214,15 +225,11 @@ class FolderLinksPageState extends State<FolderLinksPage>
       for (final link in _selectedLinks) {
         if (link.id != null) {
           await _dbHelper.deleteLink(link.id!);
-          widget.links.removeWhere((l) => l.id == link.id);
         }
       }
       _selectedLinks.clear();
       _toggleSelectionMode();
-      setState(() {
-        _filteredLinks = widget.links;
-        _sortLinks();
-      });
+      await loadLinks();
       _showSnackBar('Links deleted successfully');
     }
   }
@@ -260,10 +267,9 @@ class FolderLinksPageState extends State<FolderLinksPage>
             ),
             style: const TextStyle(fontSize: 16),
           )
-              : Text(
-            widget.folderName,
-            key: const Key('title_text'),
-            style: const TextStyle(fontWeight: FontWeight.bold),
+              : const Text(
+            'Favorites',
+            key: Key('title_text'),
           ),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -278,13 +284,13 @@ class FolderLinksPageState extends State<FolderLinksPage>
             IconButton(
               onPressed: () {
                 setState(() {
-                  _isGridView = !_isGridView;
+                  _viewMode = _viewMode == ViewMode.list ? ViewMode.grid : ViewMode.list;
                   _saveViewPreference();
                 });
               },
-              icon: Icon(_isGridView
-                  ? CupertinoIcons.list_bullet
-                  : CupertinoIcons.square_grid_2x2),
+              icon: Icon(_viewMode == ViewMode.list
+                  ? CupertinoIcons.square_grid_2x2
+                  : CupertinoIcons.list_bullet),
             ),
             PopupMenuButton(
               icon: const Icon(CupertinoIcons.ellipsis),
@@ -301,7 +307,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
                     _showSnackBar('Fetching metadata...', persistent: true);
                     try {
                       await MetadataService.clearCache();
-                      for (var link in widget.links) {
+                      for (var link in _links) {
                         final updatedMetadata =
                         await MetadataService.extractMetadata(link.url);
                         if (updatedMetadata != null) {
@@ -313,16 +319,9 @@ class FolderLinksPageState extends State<FolderLinksPage>
                             status: MetadataStatus.completed,
                           );
                           await _dbHelper.updateLink(updatedLink);
-                          final index = widget.links.indexWhere((l) => l.id == link.id);
-                          if (index != -1) {
-                            widget.links[index] = updatedLink;
-                          }
                         }
                       }
-                      setState(() {
-                        _filteredLinks = widget.links;
-                        _sortLinks();
-                      });
+                      await loadLinks();
                       _showSnackBar('Metadata fetching complete!');
                     } catch (e) {
                       _showSnackBar('Error refreshing: $e');
@@ -360,7 +359,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
               child: Row(
                 children: [
                   Text(
-                    '${_filteredLinks.length} items in ${widget.folderName}',
+                    '${_filteredLinks.length} items in total',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.outline,
                     ),
@@ -412,7 +411,9 @@ class FolderLinksPageState extends State<FolderLinksPage>
 
           // Content
           Expanded(
-            child: _filteredLinks.isEmpty
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredLinks.isEmpty
                 ? _searchController.text.isNotEmpty
                 ? Center(
               child: Column(
@@ -442,13 +443,54 @@ class FolderLinksPageState extends State<FolderLinksPage>
             )
                 : const EmptyState()
                 : RefreshIndicator(
-              onRefresh: () async {
-                setState(() {
-                  _sortLinks();
-                });
-              },
-              child: _isGridView
-                  ? GridView.builder(
+              onRefresh: loadLinks,
+              child: _viewMode == ViewMode.list
+                  ? ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 100),
+                itemCount: _filteredLinks.length,
+                itemBuilder: (context, index) => LinkCard(
+                  link: _filteredLinks[index],
+                  isGridView: false,
+                  isSelectionMode: _isSelectionMode,
+                  isSelected: _selectedLinks.contains(_filteredLinks[index]),
+                  onTap: () {
+                    if (_isSelectionMode) {
+                      _toggleLinkSelection(_filteredLinks[index]);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LinkDetailsPage(link: _filteredLinks[index]),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () {
+                    if (!_isSelectionMode) {
+                      _toggleSelectionMode();
+                    }
+                    _toggleLinkSelection(_filteredLinks[index]);
+                  },
+                  onOptionsTap: () => _showLinkOptionsMenu(context, _filteredLinks[index]),
+                  onDelete: (link) async {
+                    if (link.id != null) {
+                      await _dbHelper.deleteLink(link.id!);
+                      await loadLinks();
+                      _showSnackBar('Link deleted');
+                    }
+                  },
+                  onFavoriteToggle: (link) async {
+                    if (link.id != null) {
+                      await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
+                      await loadLinks();
+                      _showSnackBar(
+                          link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+                    }
+                  },
+                ),
+              )
+                  : GridView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.all(16),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -460,7 +502,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
                 itemCount: _filteredLinks.length,
                 itemBuilder: (context, index) => LinkCard(
                   link: _filteredLinks[index],
-                  isGridView: _isGridView,
+                  isGridView: true,
                   isSelectionMode: _isSelectionMode,
                   isSelected: _selectedLinks.contains(_filteredLinks[index]),
                   onTap: () {
@@ -485,55 +527,16 @@ class FolderLinksPageState extends State<FolderLinksPage>
                   onDelete: (link) async {
                     if (link.id != null) {
                       await _dbHelper.deleteLink(link.id!);
+                      await loadLinks();
                       _showSnackBar('Link deleted');
                     }
                   },
                   onFavoriteToggle: (link) async {
                     if (link.id != null) {
                       await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
-                      _showSnackBar(link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
-                    }
-                  },
-                ),
-              )
-                  : ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 100, top: 16),
-                itemCount: _filteredLinks.length,
-                itemBuilder: (context, index) => LinkCard(
-                  link: _filteredLinks[index],
-                  isGridView: _isGridView,
-                  isSelectionMode: _isSelectionMode,
-                  isSelected: _selectedLinks.contains(_filteredLinks[index]),
-                  onTap: () {
-                    if (_isSelectionMode) {
-                      _toggleLinkSelection(_filteredLinks[index]);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LinkDetailsPage(link: _filteredLinks[index]),
-                        ),
-                      );
-                    }
-                  },
-                  onLongPress: () {
-                    if (!_isSelectionMode) {
-                      _toggleSelectionMode();
-                    }
-                    _toggleLinkSelection(_filteredLinks[index]);
-                  },
-                  onOptionsTap: () => _showLinkOptionsMenu(context, _filteredLinks[index]),
-                  onDelete: (link) async {
-                    if (link.id != null) {
-                      await _dbHelper.deleteLink(link.id!);
-                      _showSnackBar('Link deleted');
-                    }
-                  },
-                  onFavoriteToggle: (link) async {
-                    if (link.id != null) {
-                      await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
-                      _showSnackBar(link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+                      await loadLinks();
+                      _showSnackBar(
+                          link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
                     }
                   },
                 ),
@@ -544,19 +547,19 @@ class FolderLinksPageState extends State<FolderLinksPage>
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
-        padding: const EdgeInsets.only(bottom: 80.0),
+        padding: const EdgeInsets.only(bottom: 100.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             FloatingActionButton(
-              heroTag: 'share_folder_links_page',
+              heroTag: 'share_favorites_page',
               onPressed: _shareSelectedLinks,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: const Icon(CupertinoIcons.share),
             ),
             const SizedBox(width: 16),
             FloatingActionButton(
-              heroTag: 'delete_folder_links_page',
+              heroTag: 'delete_favorites_page',
               onPressed: _deleteSelectedLinks,
               backgroundColor: Colors.red,
               child: const Icon(CupertinoIcons.trash),
@@ -668,11 +671,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
           if (confirm == true && link.id != null) {
             final deletedLink = link;
             await _dbHelper.deleteLink(link.id!);
-            setState(() {
-              widget.links.removeWhere((l) => l.id == link.id);
-              _filteredLinks = widget.links;
-              _sortLinks();
-            });
+            await loadLinks();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: const Text('Link deleted'),
@@ -685,6 +684,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
                   textColor: Colors.blue,
                   onPressed: () async {
                     await _dbHelper.insertLink(deletedLink);
+                    await loadLinks();
                   },
                 ),
               ),
@@ -703,14 +703,7 @@ class FolderLinksPageState extends State<FolderLinksPage>
         link: link,
         onSave: (updatedLink) async {
           await _dbHelper.updateLink(updatedLink);
-          setState(() {
-            final index = widget.links.indexWhere((l) => l.id == link.id);
-            if (index != -1) {
-              widget.links[index] = updatedLink;
-            }
-            _filteredLinks = widget.links;
-            _sortLinks();
-          });
+          await loadLinks();
           _showSnackBar('Notes saved');
         },
       ),

@@ -265,88 +265,159 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     final isSelected = _selectedLinks.contains(link);
     final domain = link.domain ?? Uri.parse(link.url).host;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (_isSelectionMode) {
-              _toggleLinkSelection(link);
-            } else {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => LinkDetailsPage(link: link),
-                ),
-              );
+    return Dismissible(
+      key: Key('link_${link.id}'),
+      background: Container(
+        color: Colors.yellow,
+        child: const Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.only(left: 20),
+            child: Icon(Icons.star, color: Colors.white),
+          ),
+        ),
+      ),
+      secondaryBackground: Container(
+        color: Colors.red,
+        child: const Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: EdgeInsets.only(right: 20),
+            child: Icon(Icons.delete, color: Colors.white),
+          ),
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          if (link.id != null) {
+            await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
+            await loadLinks();
+            _showSnackBar(
+                link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+          }
+          return false;
+        } else {
+          final bool? res = await showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  content: Text(
+                      "Are you sure you want to delete ${link.title}?"),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop(false);
+                      },
+                    ),
+                    TextButton(
+                      child: const Text(
+                        "Delete",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop(true);
+                      },
+                    ),
+                  ],
+                );
+              });
+          if (res == true) {
+            if (link.id != null) {
+              await _dbHelper.deleteLink(link.id!);
+              await loadLinks();
+              _showSnackBar('Link deleted');
             }
-          },
-          onLongPress: () {
-            if (!_isSelectionMode) {
-              _toggleSelectionMode();
-            }
-            _toggleLinkSelection(link);
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                if (_isSelectionMode)
-                  Checkbox(
-                    value: isSelected,
-                    onChanged: (value) => _toggleLinkSelection(link),
-                    shape: const CircleBorder(),
-                  )
-                else
-                  _buildLinkIcon(link),
-
-                const SizedBox(width: 12),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        link.title?.isNotEmpty == true ? link.title! : domain,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        domain,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${link.createdAt.day} ${_getMonthName(link.createdAt.month)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                      ),
-                    ],
+          }
+          return res;
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (_isSelectionMode) {
+                _toggleLinkSelection(link);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LinkDetailsPage(link: link),
                   ),
-                ),
+                );
+              }
+            },
+            onLongPress: () {
+              if (!_isSelectionMode) {
+                _toggleSelectionMode();
+              }
+              _toggleLinkSelection(link);
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  if (_isSelectionMode)
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (value) => _toggleLinkSelection(link),
+                      shape: const CircleBorder(),
+                    )
+                  else
+                    _buildLinkIcon(link),
 
-                if (!_isSelectionMode)
-                  IconButton(
-                    onPressed: () => _showLinkOptionsMenu(context, link),
-                    icon: const Icon(CupertinoIcons.ellipsis, size: 18),
-                    style: IconButton.styleFrom(
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          link.title?.isNotEmpty == true ? link.title! : domain,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          domain,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${link.createdAt.day} ${_getMonthName(link.createdAt.month)}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-              ],
+
+                  if (!_isSelectionMode)
+                    IconButton(
+                      onPressed: () => _showLinkOptionsMenu(context, link),
+                      icon: const Icon(CupertinoIcons.ellipsis, size: 18),
+                      style: IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -676,6 +747,21 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                     _toggleLinkSelection(_filteredLinks[index]);
                   },
                   onOptionsTap: () => _showLinkOptionsMenu(context, _filteredLinks[index]),
+                  onDelete: (link) async {
+                    if (link.id != null) {
+                      await _dbHelper.deleteLink(link.id!);
+                      await loadLinks();
+                      _showSnackBar('Link deleted');
+                    }
+                  },
+                  onFavoriteToggle: (link) async {
+                    if (link.id != null) {
+                      await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
+                      await loadLinks();
+                      _showSnackBar(
+                          link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+                    }
+                  },
                 ),
               ),
             ),
@@ -689,12 +775,14 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             FloatingActionButton(
+              heroTag: 'share_links_page',
               onPressed: _shareSelectedLinks,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: const Icon(CupertinoIcons.share),
             ),
             const SizedBox(width: 16),
             FloatingActionButton(
+              heroTag: 'delete_links_page',
               onPressed: _deleteSelectedLinks,
               backgroundColor: Colors.red,
               child: const Icon(CupertinoIcons.trash),
