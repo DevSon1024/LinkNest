@@ -54,9 +54,16 @@ class MainScreen extends StatefulWidget {
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+class _MainScreenState extends State<MainScreen>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   int _selectedIndex = 0;
-  final PageController _pageController = PageController();
+  int _previousIndex = 0;
+  late PageController _pageController;
+  late AnimationController _fabAnimationController;
+  late AnimationController _navAnimationController;
+  late Animation<double> _fabScaleAnimation;
+  late Animation<double> _navSlideAnimation;
+
   final GlobalKey<LinksPageState> _linksPageKey = GlobalKey<LinksPageState>();
   final GlobalKey<LinksFoldersPageState> _foldersPageKey =
   GlobalKey<LinksFoldersPageState>();
@@ -64,9 +71,34 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   static const _platformChannel =
   MethodChannel('com.devson.link_nest/share');
 
+  // Navigation items data
+  final List<NavigationItem> _navItems = [
+    NavigationItem(
+      icon: Icons.home_rounded,
+      activeIcon: Icons.home,
+      label: 'Home',
+    ),
+    NavigationItem(
+      icon: Icons.link,
+      activeIcon: Icons.link_rounded,
+      label: 'Links',
+    ),
+    NavigationItem(
+      icon: Icons.folder_outlined,
+      activeIcon: Icons.folder,
+      label: 'Folders',
+    ),
+    NavigationItem(
+      icon: Icons.more_horiz_rounded,
+      activeIcon: Icons.more_horiz,
+      label: 'More',
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
+    _initializeControllers();
     WidgetsBinding.instance.addObserver(this);
     _platformChannel.setMethodCallHandler(_handleMethodCall);
 
@@ -75,6 +107,39 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     service.invoke('startFetching');
 
     _processQuickSavedLinks();
+  }
+
+  void _initializeControllers() {
+    _pageController = PageController();
+
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+
+    _navAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _fabScaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.8,
+    ).animate(CurvedAnimation(
+      parent: _fabAnimationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _navSlideAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _navAnimationController,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Start navigation animation
+    _navAnimationController.forward();
   }
 
   @override
@@ -89,6 +154,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
+    _fabAnimationController.dispose();
+    _navAnimationController.dispose();
     super.dispose();
   }
 
@@ -108,93 +175,139 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _processQuickSavedLinks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final urlsToSave = prefs.getStringList('flutter.quick_save_urls');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final urlsToSave = prefs.getStringList('flutter.quick_save_urls');
 
-    if (urlsToSave == null || urlsToSave.isEmpty) {
-      return;
-    }
-
-    final dbHelper = DatabaseHelper();
-    int savedCount = 0;
-    for (final url in urlsToSave) {
-      if (!await dbHelper.linkExists(url)) {
-        final domain = Uri.tryParse(url)?.host ?? '';
-        final newLink = LinkModel(
-          url: url,
-          createdAt: DateTime.now(),
-          domain: domain,
-          status: MetadataStatus.pending,
-        );
-        await dbHelper.insertLink(newLink);
-        savedCount++;
+      if (urlsToSave == null || urlsToSave.isEmpty) {
+        return;
       }
-    }
 
-    await prefs.remove('flutter.quick_save_urls');
+      final dbHelper = DatabaseHelper();
+      int savedCount = 0;
 
-    if (savedCount > 0) {
-      _showSnackBar('$savedCount link(s) saved in background!');
-      refreshLinks();
+      // Process in batches to avoid blocking UI
+      for (int i = 0; i < urlsToSave.length; i += 5) {
+        final batch = urlsToSave.skip(i).take(5);
+
+        for (final url in batch) {
+          if (!await dbHelper.linkExists(url)) {
+            final domain = Uri.tryParse(url)?.host ?? '';
+            final newLink = LinkModel(
+              url: url,
+              createdAt: DateTime.now(),
+              domain: domain,
+              status: MetadataStatus.pending,
+            );
+            await dbHelper.insertLink(newLink);
+            savedCount++;
+          }
+        }
+
+        // Yield control back to UI
+        await Future.delayed(const Duration(microseconds: 1));
+      }
+
+      await prefs.remove('flutter.quick_save_urls');
+
+      if (savedCount > 0 && mounted) {
+        _showSnackBar('$savedCount link(s) saved in background!');
+        refreshLinks();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar('Error processing saved links');
+      }
     }
   }
 
   Future<bool> _processSharedUrl(String url, {bool navigateToLinks = false}) async {
-    final dbHelper = DatabaseHelper();
-    int savedCount = 0;
+    try {
+      final dbHelper = DatabaseHelper();
+      int savedCount = 0;
 
-    final urlsInText = MetadataService.extractUrlsFromText(url);
-    if (urlsInText.isEmpty) {
-      _showSnackBar('No valid URL found.');
-      return false;
-    }
-
-    for (final extractedUrl in urlsInText) {
-      if (!await dbHelper.linkExists(extractedUrl)) {
-        final domain = Uri.tryParse(extractedUrl)?.host ?? '';
-        final newLink = LinkModel(
-          url: extractedUrl,
-          createdAt: DateTime.now(),
-          domain: domain,
-          status: MetadataStatus.pending,
-        );
-        await dbHelper.insertLink(newLink);
-        savedCount++;
+      final urlsInText = MetadataService.extractUrlsFromText(url);
+      if (urlsInText.isEmpty) {
+        _showSnackBar('No valid URL found.');
+        return false;
       }
-    }
 
-    if (savedCount > 0) {
-      _showSnackBar('$savedCount link(s) saved!');
-      refreshLinks();
-      if (navigateToLinks) _onNavItemTapped(1);
-      return true;
-    } else {
-      _showSnackBar('Link already exists.');
-      if (navigateToLinks) _onNavItemTapped(1);
+      for (final extractedUrl in urlsInText) {
+        if (!await dbHelper.linkExists(extractedUrl)) {
+          final domain = Uri.tryParse(extractedUrl)?.host ?? '';
+          final newLink = LinkModel(
+            url: extractedUrl,
+            createdAt: DateTime.now(),
+            domain: domain,
+            status: MetadataStatus.pending,
+          );
+          await dbHelper.insertLink(newLink);
+          savedCount++;
+        }
+      }
+
+      if (savedCount > 0) {
+        _showSnackBar('$savedCount link(s) saved!');
+        refreshLinks();
+        if (navigateToLinks) _onNavItemTapped(1);
+        return true;
+      } else {
+        _showSnackBar('Link already exists.');
+        if (navigateToLinks) _onNavItemTapped(1);
+        return false;
+      }
+    } catch (e) {
+      _showSnackBar('Error saving link');
       return false;
     }
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        backgroundColor: Theme.of(context).colorScheme.inverseSurface,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
   void _onNavItemTapped(int index) {
+    if (_selectedIndex == index) return;
+
+    // Haptic feedback for better UX
+    HapticFeedback.lightImpact();
+
     setState(() {
+      _previousIndex = _selectedIndex;
       _selectedIndex = index;
-      if (_pageController.hasClients) {
-        _pageController.jumpToPage(index);
-      }
-      FocusScope.of(context).unfocus();
     });
+
+    // Animate FAB
+    _fabAnimationController.forward().then((_) {
+      _fabAnimationController.reverse();
+    });
+
+    // Navigate with smooth animation
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    // Unfocus any active text fields
+    FocusScope.of(context).unfocus();
   }
 
   void refreshLinks() {
@@ -202,99 +315,205 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _foldersPageKey.currentState?.loadFolders();
   }
 
-  Widget _buildNavItem(
-      int index, IconData filledIcon, IconData outlinedIcon, String label) {
+  Widget _buildModernNavItem(int index) {
+    final item = _navItems[index];
     final isSelected = _selectedIndex == index;
+    final theme = Theme.of(context);
+
     return Expanded(
-      child: InkWell(
-        onTap: () => _onNavItemTapped(index),
-        borderRadius: BorderRadius.circular(50),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? filledIcon : outlinedIcon,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.onPrimary
-                  : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
-              size: 28,
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onPrimary.withOpacity(0.7),
-                fontSize: 11,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _onNavItemTapped(index),
+            borderRadius: BorderRadius.circular(16),
+            splashColor: theme.colorScheme.primary.withOpacity(0.1),
+            highlightColor: theme.colorScheme.primary.withOpacity(0.05),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    padding: EdgeInsets.all(isSelected ? 8 : 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withOpacity(0.15)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: isSelected ? 26 : 24,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      fontSize: isSelected ? 12 : 11,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                    child: Text(item.label),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _buildModernFAB() {
+    final theme = Theme.of(context);
+
+    return AnimatedBuilder(
+      animation: _fabScaleAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _fabScaleAnimation.value,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.primary.withOpacity(0.8),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: FloatingActionButton(
+              backgroundColor: Colors.transparent,
+              foregroundColor: theme.colorScheme.onPrimary,
+              elevation: 0,
+              highlightElevation: 0,
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        InputPage(onLinkAdded: refreshLinks),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      const begin = Offset(0.0, 1.0);
+                      const end = Offset.zero;
+                      const curve = Curves.easeOutCubic;
+
+                      var tween = Tween(begin: begin, end: end)
+                          .chain(CurveTween(curve: curve));
+
+                      return SlideTransition(
+                        position: animation.drive(tween),
+                        child: child,
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 300),
+                  ),
+                );
+              },
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add_rounded, size: 28),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       extendBody: true,
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
         children: [
-          HomeScreen(
-            onLinkAdded: refreshLinks,
-          ),
-          LinksPage(
-            key: _linksPageKey,
-            onRefresh: refreshLinks,
-          ),
-          LinksFoldersPage(
-            key: _foldersPageKey,
-            onRefresh: refreshLinks,
-          ),
+          HomeScreen(onLinkAdded: refreshLinks),
+          LinksPage(key: _linksPageKey, onRefresh: refreshLinks),
+          LinksFoldersPage(key: _foldersPageKey, onRefresh: refreshLinks),
           const MenuPage(),
         ],
       ),
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 10.0,
-        color: Theme.of(context).colorScheme.primary,
-        elevation: 2,
-        clipBehavior: Clip.antiAlias,
-        child: SizedBox(
-          height: 71.0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'Home'),
-              _buildNavItem(1, Icons.link_rounded, Icons.link_outlined, 'Links'),
-              const SizedBox(width: 40),
-              _buildNavItem(
-                  2, Icons.folder_rounded, Icons.folder_outlined, 'Folders'),
-              _buildNavItem(3, Icons.menu_rounded, Icons.menu_outlined, 'Menu'),
-            ],
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => InputPage(
-                onLinkAdded: refreshLinks,
+      bottomNavigationBar: AnimatedBuilder(
+        animation: _navSlideAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, (1 - _navSlideAnimation.value) * 100),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+                border: Border.all(
+                  color: theme.colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  height: 80,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildModernNavItem(0),
+                      _buildModernNavItem(1),
+                      const SizedBox(width: 64), // Space for FAB
+                      _buildModernNavItem(2),
+                      _buildModernNavItem(3),
+                    ],
+                  ),
+                ),
               ),
             ),
           );
         },
-        shape: const CircleBorder(),
-        elevation: 4,
-        child: const Icon(Icons.add, size: 32),
       ),
+      floatingActionButton: _buildModernFAB(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
+}
+
+// Data class for navigation items
+class NavigationItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+
+  NavigationItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
 }
