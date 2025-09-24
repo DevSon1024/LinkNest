@@ -1,5 +1,4 @@
-// it is Link Folders page
-
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,7 +7,6 @@ import 'folder_links_page.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
 
 class LinksFoldersPage extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -19,15 +17,21 @@ class LinksFoldersPage extends StatefulWidget {
   LinksFoldersPageState createState() => LinksFoldersPageState();
 }
 
-class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderStateMixin {
+class LinksFoldersPageState extends State<LinksFoldersPage>
+    with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   Map<String, List<LinkModel>> _folders = {};
+  List<LinkModel> _allLinks = [];
+  Map<String, List<LinkModel>> _filteredFolders = {};
   final List<String> _selectedFolders = [];
   bool _isGridView = false;
   bool _isLoading = false;
   bool _isSelectionMode = false;
+  bool _isSearchVisible = false;
   late AnimationController _fabAnimationController;
+  late AnimationController _searchAnimationController;
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -36,14 +40,23 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    _searchAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
     _loadViewPreference();
     loadFolders();
+    _searchController.addListener(() {
+      _filterFolders();
+    });
   }
 
   @override
   void dispose() {
     _fabAnimationController.dispose();
+    _searchAnimationController.dispose();
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -72,13 +85,45 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
       folders.forEach((key, value) {
         value.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       });
-      setState(() => _folders = folders);
-      print('Loaded folders: ${folders.keys.toList()}');
+      setState(() {
+        _allLinks = links;
+        _folders = folders;
+        _filteredFolders = folders;
+      });
     } catch (e) {
       _showSnackBar('Error loading folders: $e');
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _filterFolders() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredFolders = _folders;
+      } else {
+        _filteredFolders = {};
+        _folders.forEach((folderName, links) {
+          if (folderName.toLowerCase().contains(query)) {
+            _filteredFolders[folderName] = links;
+          }
+        });
+      }
+    });
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearchVisible = !_isSearchVisible;
+      if (!_isSearchVisible) {
+        _searchController.clear();
+        _filterFolders();
+        _searchAnimationController.reverse();
+      } else {
+        _searchAnimationController.forward();
+      }
+    });
   }
 
   void _toggleSelectionMode() {
@@ -177,14 +222,19 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withOpacity(0.2),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               ListTile(
-                leading: Icon(Icons.folder_open, color: Theme.of(context).colorScheme.onSurface),
+                leading: Icon(CupertinoIcons.folder_open,
+                    color: Theme.of(context).colorScheme.onSurface),
                 title: const Text('Open Folder'),
-                subtitle: Text('${links.length} link${links.length == 1 ? '' : 's'}'),
+                subtitle:
+                Text('${links.length} link${links.length == 1 ? '' : 's'}'),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -199,7 +249,8 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                 },
               ),
               ListTile(
-                leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.onSurface),
+                leading: Icon(CupertinoIcons.info,
+                    color: Theme.of(context).colorScheme.onSurface),
                 title: const Text('Folder Info'),
                 onTap: () {
                   Navigator.pop(context);
@@ -228,11 +279,11 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
               child: CachedNetworkImage(
                 imageUrl: _getFaviconUrl(links.first.domain),
                 placeholder: (context, url) => Icon(
-                  Icons.folder_rounded,
+                  CupertinoIcons.folder_fill,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 errorWidget: (context, url, error) => Icon(
-                  Icons.folder_rounded,
+                  CupertinoIcons.folder_fill,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 fit: BoxFit.cover,
@@ -299,7 +350,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
   }
 
   Widget _buildFolderCard(String folderName) {
-    final links = _folders[folderName]!;
+    final links = _filteredFolders[folderName]!;
     final isSelected = _selectedFolders.contains(folderName);
 
     if (_isGridView) {
@@ -327,9 +378,9 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
+            color: Theme.of(context).colorScheme.surface,
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
@@ -337,105 +388,99 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                 offset: const Offset(0, 2),
               ),
             ],
+            border: isSelected
+                ? Border.all(
+                color: Theme.of(context).colorScheme.primary, width: 2)
+                : null,
           ),
-          child: Stack(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: isSelected
-                      ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-                      : null,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Container(
-                          color: Theme.of(context).colorScheme.surfaceContainer,
-                          child: Center(
-                            child: CircleAvatar(
-                              radius: 32,
-                              backgroundColor: Theme.of(context).colorScheme.surface,
-                              child: CachedNetworkImage(
-                                imageUrl: _getFaviconUrl(links.first.domain),
-                                placeholder: (context, url) => Shimmer.fromColors(
-                                  baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                  highlightColor: Theme.of(context).colorScheme.surfaceContainer,
-                                  child: Container(
-                                    width: 64,
-                                    height: 64,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Icon(
-                                  Icons.folder_rounded,
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  size: 32,
-                                ),
-                                fit: BoxFit.cover,
-                              ),
+              Expanded(
+                flex: 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Center(
+                    child: CircleAvatar(
+                      radius: 32,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      child: CachedNetworkImage(
+                        imageUrl: _getFaviconUrl(links.first.domain),
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          highlightColor:
+                          Theme.of(context).colorScheme.surfaceContainer,
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
                             ),
                           ),
                         ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        color: Theme.of(context).colorScheme.surface,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              folderName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                height: 1.3,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                  ),
-                                  child: Icon(
-                                    Icons.link,
-                                    size: 10,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    '${links.length} link${links.length == 1 ? '' : 's'}',
-                                    style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      fontSize: 12,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        errorWidget: (context, url, error) => Icon(
+                          CupertinoIcons.folder_fill,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 32,
                         ),
+                        fit: BoxFit.cover,
                       ),
-                    ],
+                    ),
                   ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      folderName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        height: 1.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          CupertinoIcons.link,
+                          size: 12,
+                          color:
+                          Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${links.length} link${links.length == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               if (_isSelectionMode)
@@ -450,36 +495,23 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
                       height: 24,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
                         border: Border.all(
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
                           width: 2,
                         ),
                       ),
                       child: isSelected
-                          ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.onPrimary)
+                          ? Icon(Icons.check,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onPrimary)
                           : null,
-                    ),
-                  ),
-                ),
-              if (!_isSelectionMode)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => _showFolderOptionsMenu(context, folderName),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                      child: Icon(
-                        Icons.more_vert,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.surface,
-                      ),
                     ),
                   ),
                 ),
@@ -488,11 +520,8 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         ),
       );
     } else {
-      return Card(
+      return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
@@ -517,105 +546,126 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
             _toggleFolderSelection(folderName);
           },
           child: Container(
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Theme.of(context).colorScheme.surface,
               border: isSelected
-                  ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-                  : null,
+                  ? Border.all(
+                  color: Theme.of(context).colorScheme.primary, width: 1)
+                  : Border.all(
+                  color: Theme.of(context).dividerColor, width: 0.5),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-                    child: CachedNetworkImage(
-                      imageUrl: _getFaviconUrl(links.first.domain),
-                      placeholder: (context, url) => Shimmer.fromColors(
-                        baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                        highlightColor: Theme.of(context).colorScheme.surfaceContainer,
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Icon(
-                        Icons.folder_rounded,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          folderName,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${links.length} link${links.length == 1 ? '' : 's'}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Domain: ${links.first.domain}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_isSelectionMode)
-                    AnimatedScale(
-                      scale: isSelected ? 1.0 : 0.8,
-                      duration: const Duration(milliseconds: 200),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainer,
+                  child: CachedNetworkImage(
+                    imageUrl: _getFaviconUrl(links.first.domain),
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                      highlightColor:
+                      Theme.of(context).colorScheme.surfaceContainer,
                       child: Container(
-                        width: 24,
-                        height: 24,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.surface,
-                          border: Border.all(
-                            color: isSelected ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.onSurfaceVariant,
-                            width: 2,
-                          ),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                         ),
-                        child: isSelected
-                            ? Icon(Icons.check, size: 16, color: Theme.of(context).colorScheme.onPrimary)
-                            : null,
-                      ),
-                    )
-                  else
-                    GestureDetector(
-                      onTap: () => _showFolderOptionsMenu(context, folderName),
-                      child: Icon(
-                        Icons.more_vert,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                ],
-              ),
+                    errorWidget: (context, url, error) => Icon(
+                      CupertinoIcons.folder_fill,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        folderName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${links.length} link${links.length == 1 ? '' : 's'}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Domain: ${links.first.domain}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isSelectionMode)
+                  AnimatedScale(
+                    scale: isSelected ? 1.0 : 0.8,
+                    duration: const Duration(milliseconds: 200),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
+                        border: Border.all(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Icon(Icons.check,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onPrimary)
+                          : null,
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () => _showFolderOptionsMenu(context, folderName),
+                    child: Icon(
+                      CupertinoIcons.ellipsis,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -629,13 +679,13 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.folder_off_rounded,
+            CupertinoIcons.folder_open,
             size: 80,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 16),
           Text(
-            'No folders found',
+            'No folders yet',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurface,
             ),
@@ -644,7 +694,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Add links to organize them by domain into folders',
+              'When you save links, they will be automatically organized into folders here.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -654,7 +704,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: loadFolders,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(CupertinoIcons.refresh),
             label: const Text('Refresh'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
@@ -672,97 +722,110 @@ class LinksFoldersPageState extends State<LinksFoldersPage> with TickerProviderS
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.background,
       appBar: AppBar(
-        title: const Text(
-          'Link Folders',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _isSearchVisible
+              ? TextField(
+            key: const Key('search_field'),
+            controller: _searchController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Search folders...',
+              border: InputBorder.none,
+              hintStyle: TextStyle(fontSize: 16),
+            ),
+            style: const TextStyle(fontSize: 16),
+          )
+              : const Text(
+            'Folders',
+            key: Key('title_text'),
+          ),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-        elevation: 2,
-        // In the AppBar actions section, replace the existing actions with:
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              setState(() {});
-              try {
-                final service = FlutterBackgroundService();
-                service.invoke('startFetching');
-
-                await Future.delayed(const Duration(seconds: 1));
-
-                // Clear cache first
-                await MetadataService.clearCache();
-                // Force metadata refresh by updating links
-                for (var folder in _folders.values) {
-                  for (var link in folder) {
-                    final updatedMetadata = await MetadataService.extractMetadata(link.url);
+            onPressed: _toggleSearch,
+            icon: Icon(
+                _isSearchVisible ? CupertinoIcons.xmark : CupertinoIcons.search),
+          ),
+          if (!_isSearchVisible) ...[
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  _isGridView = !_isGridView;
+                  _saveViewPreference();
+                });
+              },
+              icon: Icon(_isGridView
+                  ? CupertinoIcons.list_bullet
+                  : CupertinoIcons.square_grid_2x2),
+            ),
+            IconButton(
+              icon: const Icon(CupertinoIcons.refresh),
+              onPressed: () async {
+                _showSnackBar('Refreshing metadata...');
+                try {
+                  await MetadataService.clearCache();
+                  for (var link in _allLinks) {
+                    final updatedMetadata =
+                    await MetadataService.extractMetadata(link.url);
                     if (updatedMetadata != null) {
                       final updatedLink = link.copyWith(
                         title: updatedMetadata.title,
                         description: updatedMetadata.description,
                         imageUrl: updatedMetadata.imageUrl,
                         domain: updatedMetadata.domain,
-                        notes: link.notes,
+                        status: MetadataStatus.completed,
                       );
                       await _dbHelper.updateLink(updatedLink);
                     }
                   }
+                  await loadFolders();
+                  _showSnackBar('Metadata refreshed!');
+                } catch (e) {
+                  _showSnackBar('Error refreshing: $e');
                 }
-                // Refresh the list
-                setState(() {});
-                // Reload the folders
-                await loadFolders();
-              } catch (e) {
-                _showSnackBar('Error refreshing: $e');
-              }
-            },
-            tooltip: 'Refresh metadata',
-          ),
-          IconButton(
-            icon: Icon(
-              _isGridView ? Icons.list_rounded : Icons.grid_view_rounded,
-              color: Theme.of(context).colorScheme.onSurface,
+              },
+              tooltip: 'Refresh metadata',
             ),
-            onPressed: () {
-              setState(() {
-                _isGridView = !_isGridView;
-                _saveViewPreference();
-              });
-            },
-            tooltip: _isGridView ? 'List view' : 'Grid view',
-          ),
+          ],
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _folders.isEmpty
+          : _filteredFolders.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
         onRefresh: loadFolders,
         child: _isGridView
             ? GridView.builder(
           controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: 80),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 80),
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             childAspectRatio: 0.85,
-            crossAxisSpacing: 4,
-            mainAxisSpacing: 4,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
           ),
-          itemCount: _folders.keys.length,
+          itemCount: _filteredFolders.keys.length,
           itemBuilder: (context, index) {
-            final folderName = _folders.keys.elementAt(index);
+            final folderName =
+            _filteredFolders.keys.elementAt(index);
             return _buildFolderCard(folderName);
           },
         )
             : ListView.builder(
           controller: _scrollController,
-          padding: const EdgeInsets.only(bottom: 100, top: 16),
-          itemCount: _folders.keys.length,
+          padding: const EdgeInsets.only(bottom: 100, top: 10),
+          itemCount: _filteredFolders.keys.length,
           itemBuilder: (context, index) {
-            final folderName = _folders.keys.elementAt(index);
+            final folderName =
+            _filteredFolders.keys.elementAt(index);
             return _buildFolderCard(folderName);
           },
         ),

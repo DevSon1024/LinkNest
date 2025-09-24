@@ -36,14 +36,13 @@ class LinkCard extends StatelessWidget {
         onLongPress: onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: Theme.of(context).colorScheme.shadow.withOpacity(0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -51,14 +50,14 @@ class LinkCard extends StatelessWidget {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   border: isSelected
                       ? Border.all(
-                      color: Theme.of(context).colorScheme.primary, width: 2)
+                      color: Theme.of(context).colorScheme.primary, width: 2.5)
                       : null,
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -214,21 +213,21 @@ class LinkCard extends StatelessWidget {
       return Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           onLongPress: onLongPress,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12.0),
             child: Row(
               children: [
                 SizedBox(
-                  width: 60,
-                  height: 60,
+                  width: 80,
+                  height: 80,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     child: isMetadataReady &&
                         link.imageUrl != null &&
                         link.imageUrl!.isNotEmpty
@@ -257,20 +256,19 @@ class LinkCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         isMetadataReady
                             ? (link.description ?? link.domain)
                             : link.domain,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                          color:
+                          Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
@@ -291,9 +289,7 @@ class LinkCard extends StatelessWidget {
                         border: Border.all(
                           color: isSelected
                               ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                           width: 2,
                         ),
                       ),

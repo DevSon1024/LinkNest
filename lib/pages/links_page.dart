@@ -684,7 +684,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
-        padding: const EdgeInsets.only(bottom: 80.0),
+        padding: const EdgeInsets.only(bottom: 100.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [

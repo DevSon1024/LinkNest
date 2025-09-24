@@ -8,7 +8,7 @@ import 'pages/home_screen.dart';
 import 'pages/input_page.dart';
 import 'pages/links_folders_page.dart';
 import 'pages/links_page.dart';
-import 'screens/menu_page.dart';
+import 'pages/menu_page.dart';
 import 'screens/theme_notifier.dart';
 import 'services/database_helper.dart';
 import 'services/metadata_service.dart';

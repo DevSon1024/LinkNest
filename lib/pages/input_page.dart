@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../services/database_helper.dart';
 import '../services/metadata_service.dart';
@@ -63,7 +64,6 @@ class InputPageState extends State<InputPage> {
     int savedCount = 0;
     for (final url in urls) {
       if (await _dbHelper.linkExists(url)) {
-        // Optionally, show a message that the link already exists
         continue;
       }
       final domain = Uri.tryParse(url)?.host ?? '';
@@ -113,50 +113,26 @@ class InputPageState extends State<InputPage> {
 
   Widget _buildRecentUrlCard(String url) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _copyUrl(url),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-                child: Icon(
-                  Icons.link_rounded,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  url,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.copy_rounded,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () => _copyUrl(url),
-                tooltip: 'Copy URL',
-              ),
-            ],
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        leading: const Icon(CupertinoIcons.link, size: 22),
+        title: Text(
+          url,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
+        trailing: IconButton(
+          icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 20),
+          onPressed: () => _copyUrl(url),
+          tooltip: 'Copy URL',
+        ),
+        onTap: () => _copyUrl(url),
       ),
     );
   }
@@ -165,51 +141,39 @@ class InputPageState extends State<InputPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Add New Link',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Add New Link'),
         backgroundColor: Theme.of(context).colorScheme.surface,
-        surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
-        elevation: 2,
+        elevation: 0,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          Padding(
             padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
             child: Column(
               children: [
                 TextField(
                   controller: _urlController,
                   decoration: InputDecoration(
-                    hintText: 'Enter URL (e.g., https://example.com)',
+                    hintText: 'Enter or paste a URL',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outline),
                     ),
                     labelText: 'URL',
-                    prefixIcon: const Icon(Icons.link_rounded),
+                    prefixIcon: const Icon(CupertinoIcons.link),
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.paste),
+                          icon: const Icon(CupertinoIcons.doc_on_clipboard),
                           onPressed: _pasteUrl,
                           tooltip: 'Paste URL',
                         ),
                         if (_urlController.text.isNotEmpty)
                           IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(CupertinoIcons.xmark_circle_fill),
                             onPressed: () {
                               _urlController.clear();
                               setState(() {});
@@ -225,32 +189,27 @@ class InputPageState extends State<InputPage> {
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
+                  child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _addLink,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                      height: 20,
-                      width: 20,
+                    icon: _isLoading
+                        ? Container(
+                      width: 24,
+                      height: 24,
+                      padding: const EdgeInsets.all(2.0),
                       child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).colorScheme.onPrimary,
-                        ),
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        strokeWidth: 3,
                       ),
                     )
-                        : const Text(
-                      'Add Link',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        : const Icon(CupertinoIcons.add),
+                    label: const Text('Add Link'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
+                      textStyle: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                   ),
@@ -259,9 +218,9 @@ class InputPageState extends State<InputPage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Recent URLs',
+              'Recently Added',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -276,24 +235,37 @@ class InputPageState extends State<InputPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.link_off_rounded,
+                    CupertinoIcons.link_circle,
                     size: 80,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No recent URLs',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 40),
                     child: Text(
-                      'Add your first link to see recent URLs here',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      'Your recently added links will appear here.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -304,7 +276,7 @@ class InputPageState extends State<InputPage> {
                 : RefreshIndicator(
               onRefresh: _loadRecentUrls,
               child: ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80, top: 0),
+                padding: const EdgeInsets.only(bottom: 80),
                 itemCount: _recentUrls.length,
                 itemBuilder: (context, index) {
                   return _buildRecentUrlCard(_recentUrls[index]);
