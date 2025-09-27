@@ -9,7 +9,6 @@ import '../../core/services/metadata_service.dart';
 import '../widgets/link_card.dart';
 import '../widgets/empty_state.dart';
 import 'widgets/link_options_menu.dart';
-import 'widgets/edit_notes_dialog.dart';
 import 'package:flutter/services.dart';
 import 'link_details_page.dart';
 
@@ -846,7 +845,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           );
         },
         onOpenInBrowser: () => _openLink(link.url, useDefaultBrowser: true),
-        onEditNotes: () => _showEditNotesDialog(context, link),
         onCopyUrl: () {
           Clipboard.setData(ClipboardData(text: link.url));
           _showSnackBar('URL copied to clipboard');
@@ -913,21 +911,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               ),
             );
           }
-        },
-      ),
-    );
-  }
-
-  Future<void> _showEditNotesDialog(
-      BuildContext context, LinkModel link) async {
-    await showDialog(
-      context: context,
-      builder: (context) => EditNotesDialog(
-        link: link,
-        onSave: (updatedLink) async {
-          await _dbHelper.updateLink(updatedLink);
-          await loadLinks();
-          _showSnackBar('Notes saved');
         },
       ),
     );

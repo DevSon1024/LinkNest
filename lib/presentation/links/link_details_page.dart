@@ -5,7 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/models/link_model.dart';
 import '../../core/services/database_helper.dart';
-import 'full_screen_image_page.dart'; // Import the new full-screen image page
+import 'full_screen_image_page.dart';
 
 class LinkDetailsPage extends StatefulWidget {
   final LinkModel link;
@@ -103,7 +103,8 @@ class _LinkDetailsPageState extends State<LinkDetailsPage> {
                     color: Theme.of(context).colorScheme.surfaceContainer,
                     child: Icon(
                       CupertinoIcons.link,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color:
+                      Theme.of(context).colorScheme.onSurfaceVariant,
                       size: 100,
                     ),
                   ),
@@ -180,7 +181,8 @@ class _LinkDetailsPageState extends State<LinkDetailsPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Text('Notes', style: Theme.of(context).textTheme.titleLarge),
+                    Text('Notes',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _notesController,

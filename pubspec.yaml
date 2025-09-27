@@ -1,4 +1,4 @@
-name: LinkNest
+name: linknest
 description: A Flutter app to save and organize shared links
 publish_to: 'none'
 vesrionCode: 105
@@ -52,10 +52,10 @@ flutter:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/logo.png"  # <-- your logo path
+  image_path: "assets/logo.png"
 
 flutter_native_splash:
-  color: "#ffffff" # background color
+  color: "#ffffff"
   image: assets/logo.png
   android: true
   ios: true

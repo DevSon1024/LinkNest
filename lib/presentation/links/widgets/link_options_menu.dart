@@ -5,7 +5,6 @@ class LinkOptionsMenu extends StatelessWidget {
   final LinkModel link;
   final VoidCallback onOpenInApp;
   final VoidCallback onOpenInBrowser;
-  final VoidCallback onEditNotes;
   final VoidCallback onCopyUrl;
   final VoidCallback onShare;
   final VoidCallback onDelete;
@@ -15,7 +14,6 @@ class LinkOptionsMenu extends StatelessWidget {
     required this.link,
     required this.onOpenInApp,
     required this.onOpenInBrowser,
-    required this.onEditNotes,
     required this.onCopyUrl,
     required this.onShare,
     required this.onDelete,

@@ -13,7 +13,7 @@ import 'presentation/favorites/favorites_page.dart';
 import 'core/theme/theme_notifier.dart';
 import 'core/services/database_helper.dart';
 import 'core/services/metadata_service.dart';
-import 'core/services/background_service.dart';
+import 'package:linknest/core/services/background_service.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 
 void main() async {

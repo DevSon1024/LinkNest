@@ -10,7 +10,6 @@ import '../../core/services/metadata_service.dart';
 import '../widgets/link_card.dart';
 import '../widgets/empty_state.dart';
 import '../links/widgets/link_options_menu.dart';
-import '../links/widgets/edit_notes_dialog.dart';
 import '../links/link_details_page.dart';
 
 enum SortOrder { latest, oldest }
@@ -620,7 +619,6 @@ class FolderLinksPageState extends State<FolderLinksPage>
           );
         },
         onOpenInBrowser: () => _openLink(link.url, useDefaultBrowser: true),
-        onEditNotes: () => _showEditNotesDialog(context, link),
         onCopyUrl: () {
           Clipboard.setData(ClipboardData(text: link.url));
           _showSnackBar('URL copied to clipboard');
@@ -690,28 +688,6 @@ class FolderLinksPageState extends State<FolderLinksPage>
               ),
             );
           }
-        },
-      ),
-    );
-  }
-
-  Future<void> _showEditNotesDialog(
-      BuildContext context, LinkModel link) async {
-    await showDialog(
-      context: context,
-      builder: (context) => EditNotesDialog(
-        link: link,
-        onSave: (updatedLink) async {
-          await _dbHelper.updateLink(updatedLink);
-          setState(() {
-            final index = widget.links.indexWhere((l) => l.id == link.id);
-            if (index != -1) {
-              widget.links[index] = updatedLink;
-            }
-            _filteredLinks = widget.links;
-            _sortLinks();
-          });
-          _showSnackBar('Notes saved');
         },
       ),
     );
