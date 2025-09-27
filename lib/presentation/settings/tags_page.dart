@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../services/database_helper.dart';
+import '../../core/services/database_helper.dart';
 
 class TagsPage extends StatefulWidget {
   const TagsPage({super.key});

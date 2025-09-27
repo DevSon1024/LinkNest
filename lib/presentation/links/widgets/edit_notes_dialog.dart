@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
-import '../../models/link_model.dart';
+import '../../../data/models/link_model.dart';
 
 class EditNotesDialog extends StatefulWidget {
   final LinkModel link;

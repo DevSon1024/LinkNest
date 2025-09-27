@@ -4,14 +4,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/link_model.dart';
-import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
-import 'links_page_widgets/link_card.dart';
-import 'links_page_widgets/empty_state.dart';
-import 'links_page_widgets/link_options_menu.dart';
-import 'links_page_widgets/edit_notes_dialog.dart';
-import 'link_details_page.dart';
+import '../../data/models/link_model.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/metadata_service.dart';
+import '../widgets/link_card.dart';
+import '../widgets/empty_state.dart';
+import '../links/widgets/link_options_menu.dart';
+import '../links/widgets/edit_notes_dialog.dart';
+import '../links/link_details_page.dart';
 
 enum SortOrder { latest, oldest }
 

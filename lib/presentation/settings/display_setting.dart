@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'theme_notifier.dart';
+import '../../core/theme/theme_notifier.dart';
 
 class DisplaySetting extends StatelessWidget {
   const DisplaySetting({super.key});

@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/link_model.dart';
-import '../services/database_helper.dart';
+import '../../data/models/link_model.dart';
+import '../../core/services/database_helper.dart';
 import 'full_screen_image_page.dart'; // Import the new full-screen image page
 
 class LinkDetailsPage extends StatefulWidget {

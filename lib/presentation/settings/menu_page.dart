@@ -1,10 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../screens/storage_setting.dart';
-import '../screens/version_page.dart';
-import '../screens/display_setting.dart';
-import '../screens/tags_page.dart';
+import 'storage_setting.dart';
+import 'version_page.dart';
+import 'display_setting.dart';
+import 'tags_page.dart';
 
 class MenuPage extends StatelessWidget {
   const MenuPage({super.key});

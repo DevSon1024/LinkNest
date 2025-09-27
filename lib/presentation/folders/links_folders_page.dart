@@ -4,9 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'folder_links_page.dart';
-import '../models/link_model.dart';
-import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
+import '../../data/models/link_model.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/metadata_service.dart';
 
 class LinksFoldersPage extends StatefulWidget {
   final VoidCallback? onRefresh;

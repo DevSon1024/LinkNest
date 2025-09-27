@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
-import '../../models/link_model.dart';
-import '../../services/database_helper.dart';
+import '../../data/models/link_model.dart';
+import '../../core/services/database_helper.dart';
 
 class LinkCard extends StatelessWidget {
   final LinkModel link;

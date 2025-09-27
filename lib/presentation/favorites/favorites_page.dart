@@ -3,29 +3,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/cupertino.dart';
-import '../models/link_model.dart';
-import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
-import 'links_page_widgets/link_card.dart';
-import 'links_page_widgets/empty_state.dart';
-import 'links_page_widgets/link_options_menu.dart';
-import 'links_page_widgets/edit_notes_dialog.dart';
+import '../../data/models/link_model.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/metadata_service.dart';
+import '../widgets/link_card.dart';
+import '../widgets/empty_state.dart';
+import '../links/widgets/link_options_menu.dart';
+import '../links/widgets/edit_notes_dialog.dart';
 import 'package:flutter/services.dart';
-import 'link_details_page.dart';
+import '../links/link_details_page.dart';
 
 enum SortOrder { latest, oldest }
 enum ViewMode { list, grid }
 
-class LinksPage extends StatefulWidget {
+class FavoritesPage extends StatefulWidget {
   final VoidCallback? onRefresh;
 
-  const LinksPage({super.key, this.onRefresh});
+  const FavoritesPage({super.key, this.onRefresh});
 
   @override
-  LinksPageState createState() => LinksPageState();
+  FavoritesPageState createState() => FavoritesPageState();
 }
 
-class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
+class FavoritesPageState extends State<FavoritesPage> with TickerProviderStateMixin {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   List<LinkModel> _links = [];
   List<LinkModel> _filteredLinks = [];
@@ -84,7 +84,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   Future<void> loadLinks() async {
     setState(() => _isLoading = true);
     try {
-      final links = await _dbHelper.getAllLinks();
+      final links = await _dbHelper.getFavoriteLinks();
       setState(() {
         _links = links;
         _filteredLinks = links;
@@ -248,269 +248,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildLinkIcon(LinkModel link) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(CupertinoIcons.link,
-          color: Theme.of(context).colorScheme.primary, size: 20),
-    );
-  }
-
-  Widget _buildModernLinkTile(LinkModel link, int index) {
-    final isSelected = _selectedLinks.contains(link);
-    final domain = link.domain ?? Uri.parse(link.url).host;
-
-    return Dismissible(
-      key: Key('link_${link.id}'),
-      background: Container(
-        color: Colors.yellow,
-        child: const Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: EdgeInsets.only(left: 20),
-            child: Icon(Icons.star, color: Colors.white),
-          ),
-        ),
-      ),
-      secondaryBackground: Container(
-        color: Colors.red,
-        child: const Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: EdgeInsets.only(right: 20),
-            child: Icon(Icons.delete, color: Colors.white),
-          ),
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        if (direction == DismissDirection.startToEnd) {
-          if (link.id != null) {
-            await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
-            await loadLinks();
-            _showSnackBar(
-                link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
-          }
-          return false;
-        } else {
-          final bool? res = await showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  content: Text(
-                      "Are you sure you want to delete ${link.title}?"),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(color: Colors.black),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop(false);
-                      },
-                    ),
-                    TextButton(
-                      child: const Text(
-                        "Delete",
-                        style: TextStyle(color: Colors.red),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop(true);
-                      },
-                    ),
-                  ],
-                );
-              });
-          if (res == true) {
-            if (link.id != null) {
-              await _dbHelper.deleteLink(link.id!);
-              await loadLinks();
-              _showSnackBar('Link deleted');
-            }
-          }
-          return res;
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              if (_isSelectionMode) {
-                _toggleLinkSelection(link);
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LinkDetailsPage(link: link),
-                  ),
-                );
-              }
-            },
-            onLongPress: () {
-              if (!_isSelectionMode) {
-                _toggleSelectionMode();
-              }
-              _toggleLinkSelection(link);
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  if (_isSelectionMode)
-                    Checkbox(
-                      value: isSelected,
-                      onChanged: (value) => _toggleLinkSelection(link),
-                      shape: const CircleBorder(),
-                    )
-                  else
-                    _buildLinkIcon(link),
-
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          link.title?.isNotEmpty == true ? link.title! : domain,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          domain,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${link.createdAt.day} ${_getMonthName(link.createdAt.month)}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  if (!_isSelectionMode)
-                    IconButton(
-                      onPressed: () => _showLinkOptionsMenu(context, link),
-                      icon: const Icon(CupertinoIcons.ellipsis, size: 18),
-                      style: IconButton.styleFrom(
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _getMonthName(int month) {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return months[month - 1];
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildGroupedLinks() {
-    if (_filteredLinks.isEmpty) return [];
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final threeDaysAgo = today.subtract(const Duration(days: 3));
-
-    final todayLinks = <LinkModel>[];
-    final threeDaysAgoLinks = <LinkModel>[];
-    final olderLinks = <LinkModel>[];
-
-    for (final link in _filteredLinks) {
-      final linkDate = DateTime(
-        link.createdAt.year,
-        link.createdAt.month,
-        link.createdAt.day,
-      );
-
-      if (linkDate == today) {
-        todayLinks.add(link);
-      } else if (linkDate.isAfter(threeDaysAgo)) {
-        threeDaysAgoLinks.add(link);
-      } else {
-        olderLinks.add(link);
-      }
-    }
-
-    final widgets = <Widget>[];
-
-    if (todayLinks.isNotEmpty) {
-      widgets.add(_buildSectionHeader('Today'));
-      for (int i = 0; i < todayLinks.length; i++) {
-        widgets.add(_buildModernLinkTile(todayLinks[i], i));
-      }
-    }
-
-    if (threeDaysAgoLinks.isNotEmpty) {
-      widgets.add(_buildSectionHeader('3 days ago'));
-      for (int i = 0; i < threeDaysAgoLinks.length; i++) {
-        widgets.add(_buildModernLinkTile(threeDaysAgoLinks[i], i));
-      }
-    }
-
-    if (olderLinks.isNotEmpty) {
-      // Group older links by date
-      final dateGroups = <String, List<LinkModel>>{};
-      for (final link in olderLinks) {
-        final dateKey = '${link.createdAt.year}/${link.createdAt.month.toString().padLeft(2, '0')}/${link.createdAt.day.toString().padLeft(2, '0')}';
-        dateGroups.putIfAbsent(dateKey, () => []).add(link);
-      }
-
-      final sortedDates = dateGroups.keys.toList()..sort((a, b) => b.compareTo(a));
-
-      for (final dateKey in sortedDates) {
-        widgets.add(_buildSectionHeader(dateKey));
-        final linksForDate = dateGroups[dateKey]!;
-        for (int i = 0; i < linksForDate.length; i++) {
-          widgets.add(_buildModernLinkTile(linksForDate[i], i));
-        }
-      }
-    }
-
-    return widgets;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -531,7 +268,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             style: const TextStyle(fontSize: 16),
           )
               : const Text(
-            'Saved Links',
+            'Favorites',
             key: Key('title_text'),
           ),
         ),
@@ -708,10 +445,50 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                 : RefreshIndicator(
               onRefresh: loadLinks,
               child: _viewMode == ViewMode.list
-                  ? ListView(
+                  ? ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 100),
-                children: _buildGroupedLinks(),
+                itemCount: _filteredLinks.length,
+                itemBuilder: (context, index) => LinkCard(
+                  link: _filteredLinks[index],
+                  isGridView: false,
+                  isSelectionMode: _isSelectionMode,
+                  isSelected: _selectedLinks.contains(_filteredLinks[index]),
+                  onTap: () {
+                    if (_isSelectionMode) {
+                      _toggleLinkSelection(_filteredLinks[index]);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LinkDetailsPage(link: _filteredLinks[index]),
+                        ),
+                      );
+                    }
+                  },
+                  onLongPress: () {
+                    if (!_isSelectionMode) {
+                      _toggleSelectionMode();
+                    }
+                    _toggleLinkSelection(_filteredLinks[index]);
+                  },
+                  onOptionsTap: () => _showLinkOptionsMenu(context, _filteredLinks[index]),
+                  onDelete: (link) async {
+                    if (link.id != null) {
+                      await _dbHelper.deleteLink(link.id!);
+                      await loadLinks();
+                      _showSnackBar('Link deleted');
+                    }
+                  },
+                  onFavoriteToggle: (link) async {
+                    if (link.id != null) {
+                      await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
+                      await loadLinks();
+                      _showSnackBar(
+                          link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+                    }
+                  },
+                ),
               )
                   : GridView.builder(
                 controller: _scrollController,
@@ -775,14 +552,14 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             FloatingActionButton(
-              heroTag: 'share_links_page',
+              heroTag: 'share_favorites_page',
               onPressed: _shareSelectedLinks,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: const Icon(CupertinoIcons.share),
             ),
             const SizedBox(width: 16),
             FloatingActionButton(
-              heroTag: 'delete_links_page',
+              heroTag: 'delete_favorites_page',
               onPressed: _deleteSelectedLinks,
               backgroundColor: Colors.red,
               child: const Icon(CupertinoIcons.trash),

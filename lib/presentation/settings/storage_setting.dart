@@ -9,9 +9,9 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import '../services/database_helper.dart';
+import '../../core/services/database_helper.dart';
 import 'permission_page.dart';
-import '../models/link_model.dart';
+import '../../data/models/link_model.dart';
 
 class StorageSetting extends StatefulWidget {
   const StorageSetting({super.key});

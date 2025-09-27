@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/link_model.dart';
+import '../../../data/models/link_model.dart';
 
 class LinkOptionsMenu extends StatelessWidget {
   final LinkModel link;

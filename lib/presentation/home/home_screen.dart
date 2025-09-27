@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
-import 'favorites_page.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/metadata_service.dart';
+import '../favorites/favorites_page.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onLinkAdded;

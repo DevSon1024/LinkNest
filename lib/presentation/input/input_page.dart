@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../services/database_helper.dart';
-import '../services/metadata_service.dart';
+import '../../core/services/database_helper.dart';
+import '../../core/services/metadata_service.dart';
 import 'package:flutter/services.dart';
-import '../models/link_model.dart';
+import '../../data/models/link_model.dart';
 
 class InputPage extends StatefulWidget {
   final VoidCallback? onLinkAdded;
