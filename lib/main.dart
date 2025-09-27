@@ -3,17 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'models/link_model.dart';
-import 'pages/home_screen.dart';
-import 'pages/input_page.dart';
-import 'pages/links_folders_page.dart';
-import 'pages/links_page.dart';
-import 'pages/menu_page.dart';
-import 'pages/favorites_page.dart';
-import 'screens/theme_notifier.dart';
-import 'services/database_helper.dart';
-import 'services/metadata_service.dart';
-import 'services/background_service.dart';
+import 'data/models/link_model.dart';
+import 'presentation/home/home_screen.dart';
+import 'presentation/input/input_page.dart';
+import 'presentation/folders/links_folders_page.dart';
+import 'presentation/links/links_page.dart';
+import 'presentation/settings/menu_page.dart';
+import 'presentation/favorites/favorites_page.dart';
+import 'core/theme/theme_notifier.dart';
+import 'core/services/database_helper.dart';
+import 'core/services/metadata_service.dart';
+import 'core/services/background_service.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 
 void main() async {
