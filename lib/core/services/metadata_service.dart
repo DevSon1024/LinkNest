@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:metadata_fetch/metadata_fetch.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/link_model.dart';
+import '../../data/models/link_model.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';

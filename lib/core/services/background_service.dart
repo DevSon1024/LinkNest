@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import '../models/link_model.dart';
+import '../../data/models/link_model.dart';
 import 'database_helper.dart';
 import 'metadata_service.dart';
 
