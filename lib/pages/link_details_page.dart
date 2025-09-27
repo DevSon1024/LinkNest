@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/link_model.dart';
 import '../services/database_helper.dart';
+import 'full_screen_image_page.dart'; // Import the new full-screen image page
 
 class LinkDetailsPage extends StatefulWidget {
   final LinkModel link;
@@ -77,22 +78,34 @@ class _LinkDetailsPageState extends State<LinkDetailsPage> {
               stretchModes: const [StretchMode.zoomBackground],
               background: (widget.link.imageUrl != null &&
                   widget.link.imageUrl!.isNotEmpty)
-                  ? CachedNetworkImage(
-                imageUrl: widget.link.imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(
-                    color: Colors.white,
+                  ? GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenImagePage(
+                        imageUrl: widget.link.imageUrl!,
+                      ),
+                    ),
+                  );
+                },
+                child: CachedNetworkImage(
+                  imageUrl: widget.link.imageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  child: Icon(
-                    CupertinoIcons.link,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    size: 100,
+                  errorWidget: (context, url, error) => Container(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    child: Icon(
+                      CupertinoIcons.link,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      size: 100,
+                    ),
                   ),
                 ),
               )

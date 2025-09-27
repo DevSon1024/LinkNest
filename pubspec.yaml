@@ -1,8 +1,8 @@
 name: LinkNest
 description: A Flutter app to save and organize shared links
 publish_to: 'none'
-vesrionCode: 104
-version: 1.0.4+1
+vesrionCode: 105
+version: 1.0.5+1
 
 environment:
   sdk: ^3.7.2
@@ -34,7 +34,8 @@ dependencies:
   uri: ^1.0.0
   readability: ^0.2.2
   flutter_background_service: ^5.0.5
-  flutter_inappwebview: ^6.0.0
+  flutter_inappwebview: ^6.1.5
+  flutter_image_compress: ^2.4.0
 
 dev_dependencies:
   flutter_test:

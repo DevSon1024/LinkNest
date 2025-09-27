@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:http/http.dart' as http;
 import 'package:metadata_fetch/metadata_fetch.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/link_model.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'dart:typed_data';
 
 class MetadataService {
   static final Map<String, LinkModel> _cache = {};
@@ -53,47 +57,24 @@ class MetadataService {
         ],
       ),
       onLoadStop: (controller, uri) async {
-        // Prevent the future from completing more than once
         if (completer.isCompleted) return;
 
         try {
-          // Add a delay to ensure all dynamic content has loaded
-          await Future.delayed(const Duration(milliseconds: 1500));
+          await Future.delayed(const Duration(milliseconds: 1200)); // Reduced delay
 
           final title = await controller.getTitle();
-
-          // Advanced script to find the best possible image URL
           final String? imageUrl = await controller.evaluateJavascript(source: '''
-            (function() {
-              // Priority 1: Open Graph image
-              let image = document.querySelector("meta[property='og:image']")?.getAttribute('content');
-              if (image) return image;
+          // ... (your existing JS for image extraction)
+        ''');
 
-              // Priority 2: Twitter card image
-              image = document.querySelector("meta[name='twitter:image']")?.getAttribute('content');
-              if (image) return image;
-
-              // Priority 3: Find the largest image in the main content area
-              let images = Array.from(document.querySelectorAll('img'));
-              let largestImage = null;
-              let maxArea = 0;
-              for (const img of images) {
-                if (img.naturalWidth > 300 && img.naturalHeight > 300) { // Filter for reasonably sized images
-                  let area = img.naturalWidth * img.naturalHeight;
-                  if (area > maxArea) {
-                    maxArea = area;
-                    largestImage = img.src;
-                  }
-                }
-              }
-              return largestImage;
-            })();
-          ''');
+          String? compressedImagePath;
+          if (imageUrl != null && imageUrl.isNotEmpty) {
+            compressedImagePath = await _compressImage(imageUrl);
+          }
 
           final String? description = await controller.evaluateJavascript(source: '''
-            document.querySelector("meta[name='description']")?.getAttribute('content') ||
-            document.querySelector("meta[property='og:description']")?.getAttribute('content');
-          ''');
+          // ... (your existing JS for description extraction)
+        ''');
 
           final domain = uri?.host.replaceFirst('www.', '') ?? Uri.parse(url).host.replaceFirst('www.', '');
 
@@ -101,7 +82,7 @@ class MetadataService {
             url: url,
             title: title?.trim().isNotEmpty == true ? title!.trim() : domain,
             description: description?.trim(),
-            imageUrl: imageUrl?.trim(),
+            imageUrl: compressedImagePath, // Use the compressed image path
             createdAt: DateTime.now(),
             domain: domain,
             tags: [],
@@ -142,47 +123,75 @@ class MetadataService {
     }
 
     try {
-      LinkModel? linkModel = await _extractMetadataWithWebView(url);
-
-      if (linkModel == null) {
-        final uri = Uri.parse(url);
-        linkModel = LinkModel(
-          url: url,
-          title: uri.host.replaceFirst('www.', ''),
-          description: 'Unable to load preview',
-          imageUrl: '',
-          createdAt: DateTime.now(),
-          domain: uri.host.replaceFirst('www.', ''),
-          tags: [],
-          notes: null,
-          status: MetadataStatus.failed,
-        );
-      }
-
-      _cache[url] = linkModel;
-      await _saveCache();
-      return linkModel;
-
-    } catch (e) {
-      print('Fatal error extracting metadata: $e');
-      final uri = Uri.tryParse(url);
-      if (uri != null) {
+      // First, try with metadata_fetch for a quick result
+      final metadata = await MetadataFetch.extract(url);
+      if (metadata != null && metadata.title != null) {
         final linkModel = LinkModel(
           url: url,
-          title: uri.host.replaceFirst('www.', ''),
-          description: 'Unable to load preview',
-          imageUrl: '',
+          title: metadata.title,
+          description: metadata.description,
+          imageUrl: metadata.image,
           createdAt: DateTime.now(),
-          domain: uri.host.replaceFirst('www.', ''),
-          tags: [],
-          notes: null,
+          domain: Uri.parse(url).host.replaceFirst('www.', ''),
+          status: MetadataStatus.completed,
         );
         _cache[url] = linkModel;
         await _saveCache();
         return linkModel;
       }
+    } catch (e) {
+      // Fallback to WebView if metadata_fetch fails
+    }
+
+    // Fallback to the more reliable WebView method
+    LinkModel? linkModel = await _extractMetadataWithWebView(url);
+
+    if (linkModel == null) {
+      final uri = Uri.parse(url);
+      linkModel = LinkModel(
+        url: url,
+        title: uri.host.replaceFirst('www.', ''),
+        description: 'Unable to load preview',
+        imageUrl: '',
+        createdAt: DateTime.now(),
+        domain: uri.host.replaceFirst('www.', ''),
+        status: MetadataStatus.failed,
+      );
+    }
+    _cache[url] = linkModel;
+    await _saveCache();
+    return linkModel;
+  }
+
+  static Future<String?> _compressImage(String imageUrl) async {
+    try {
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode == 200) {
+        final originalFile = await _saveTemporaryFile(response.bodyBytes, 'original');
+        final targetPath = (await getTemporaryDirectory()).path + '/${DateTime.now().millisecondsSinceEpoch}_compressed.jpg';
+
+        final result = await FlutterImageCompress.compressAndGetFile(
+          originalFile.absolute.path,
+          targetPath,
+          quality: 60, // Adjust quality as needed
+        );
+
+        await originalFile.delete(); // Clean up original file
+
+        return result?.path;
+      }
+    } catch (e) {
+      print('Image compression failed: $e');
       return null;
     }
+    return null;
+  }
+
+  static Future<File> _saveTemporaryFile(Uint8List bytes, String name) async {
+    final directory = await getTemporaryDirectory();
+    final file = File('${directory.path}/$name.jpg');
+    await file.writeAsBytes(bytes);
+    return file;
   }
 
   static List<String> extractUrlsFromText(String text) {
