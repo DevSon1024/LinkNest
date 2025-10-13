@@ -248,6 +248,29 @@ class FavoritesPageState extends State<FavoritesPage> with TickerProviderStateMi
     );
   }
 
+  void updateLink(LinkModel updatedLink) {
+    if (!mounted) return;
+    // If the link is no longer a favorite, remove it. Otherwise, update it.
+    if (!updatedLink.isFavorite) {
+      setState(() {
+        _links.removeWhere((link) => link.id == updatedLink.id);
+        _filteredLinks.removeWhere((link) => link.id == updatedLink.id);
+      });
+    } else {
+      setState(() {
+        final index = _links.indexWhere((link) => link.id == updatedLink.id);
+        if (index != -1) {
+          _links[index] = updatedLink;
+        }
+
+        final filteredIndex = _filteredLinks.indexWhere((link) => link.id == updatedLink.id);
+        if (filteredIndex != -1) {
+          _filteredLinks[filteredIndex] = updatedLink;
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

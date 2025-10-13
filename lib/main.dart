@@ -98,6 +98,8 @@ class _MainScreenState extends State<MainScreen>
     ),
   ];
 
+  // Inside _MainScreenState class in lib/main.dart
+
   @override
   void initState() {
     super.initState();
@@ -109,6 +111,21 @@ class _MainScreenState extends State<MainScreen>
     service.startService();
     service.invoke('startFetching');
 
+    // Listen for updates from the background service
+    service.on('update').listen((event) {
+      refreshLinks();
+    });
+
+    service.on('linkUpdated').listen((event) {
+      if (event != null && event['link'] != null) {
+        final linkData = Map<String, dynamic>.from(event['link']);
+        final updatedLink = LinkModel.fromMap(linkData);
+
+        // Update the link in the appropriate page
+        _linksPageKey.currentState?.updateLink(updatedLink);
+        _favoritesPageKey.currentState?.updateLink(updatedLink);
+      }
+    });
     _processQuickSavedLinks();
   }
 

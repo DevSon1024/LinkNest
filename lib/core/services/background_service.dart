@@ -49,11 +49,19 @@ void onStart(ServiceInstance service) {
               status: MetadataStatus.completed,
             );
             await dbHelper.updateLink(updatedLink);
+            // Send the updated link data to the UI
+            service.invoke('linkUpdated', {'link': updatedLink.toMap()});
           } else {
-            await dbHelper.updateLink(link.copyWith(status: MetadataStatus.failed));
+            final failedLink = link.copyWith(status: MetadataStatus.failed);
+            await dbHelper.updateLink(failedLink);
+            // Also notify the UI about the failure
+            service.invoke('linkUpdated', {'link': failedLink.toMap()});
           }
         } catch (e) {
-          await dbHelper.updateLink(link.copyWith(status: MetadataStatus.failed));
+          final failedLink = link.copyWith(status: MetadataStatus.failed);
+          await dbHelper.updateLink(failedLink);
+          // Also notify the UI about the failure
+          service.invoke('linkUpdated', {'link': failedLink.toMap()});
         }
       }
     });

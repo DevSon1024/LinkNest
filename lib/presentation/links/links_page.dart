@@ -66,6 +66,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
+
   Future<void> _loadViewPreference() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -111,6 +112,21 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         }).toList();
       }
       _sortLinks();
+    });
+  }
+
+  void updateLink(LinkModel updatedLink) {
+    if (!mounted) return;
+    setState(() {
+      final index = _links.indexWhere((link) => link.id == updatedLink.id);
+      if (index != -1) {
+        _links[index] = updatedLink;
+      }
+
+      final filteredIndex = _filteredLinks.indexWhere((link) => link.id == updatedLink.id);
+      if (filteredIndex != -1) {
+        _filteredLinks[filteredIndex] = updatedLink;
+      }
     });
   }
 
@@ -709,12 +725,12 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               child: _viewMode == ViewMode.list
                   ? ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 100),
+                padding: const EdgeInsets.only(bottom: 200),
                 children: _buildGroupedLinks(),
               )
                   : GridView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   childAspectRatio: 0.75,

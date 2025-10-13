@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../data/models/link_model.dart';
 import '../../core/services/database_helper.dart';
+import 'dart:convert';
 
 class LinkCard extends StatelessWidget {
   final LinkModel link;
@@ -27,6 +28,24 @@ class LinkCard extends StatelessWidget {
     required this.onDelete,
     required this.onFavoriteToggle,
   });
+
+  Widget _buildImageFromDataUrl(String dataUrl, BuildContext context) {
+    try {
+      final String base64String = dataUrl.split(',').last;
+      final imageData = base64Decode(base64String);
+      return Image.memory(
+        imageData,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          // Fallback for decoding errors within the Image widget
+          return _buildPlaceholderIcon(context);
+        },
+      );
+    } catch (e) {
+      // Fallback for base64 decoding errors
+      return _buildPlaceholderIcon(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,7 +161,9 @@ class LinkCard extends StatelessWidget {
                         child: isMetadataReady &&
                             link.imageUrl != null &&
                             link.imageUrl!.isNotEmpty
-                            ? CachedNetworkImage(
+                            ? (link.imageUrl!.startsWith('data:image')
+                            ? _buildImageFromDataUrl(link.imageUrl!, context)
+                            : CachedNetworkImage(
                           imageUrl: link.imageUrl!,
                           fit: BoxFit.cover,
                           placeholder: (context, url) =>
@@ -160,7 +181,7 @@ class LinkCard extends StatelessWidget {
                               ),
                           errorWidget: (context, url, error) =>
                               _buildPlaceholderIcon(context),
-                        )
+                        ))
                             : _buildPlaceholderIcon(context),
                       ),
                     ),
@@ -313,7 +334,9 @@ class LinkCard extends StatelessWidget {
                   child: isMetadataReady &&
                       link.imageUrl != null &&
                       link.imageUrl!.isNotEmpty
-                      ? CachedNetworkImage(
+                      ? (link.imageUrl!.startsWith('data:image')
+                      ? _buildImageFromDataUrl(link.imageUrl!, context)
+                      : CachedNetworkImage(
                     imageUrl: link.imageUrl!,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Shimmer.fromColors(
@@ -323,7 +346,7 @@ class LinkCard extends StatelessWidget {
                     ),
                     errorWidget: (context, url, error) =>
                         _buildPlaceholderFavicon(context),
-                  )
+                  ))
                       : _buildPlaceholderFavicon(context),
                 ),
               ),
