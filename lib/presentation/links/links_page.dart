@@ -237,7 +237,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(message, style: TextStyle(color: Theme.of(context).colorScheme.onInverseSurface)),
         backgroundColor: Theme.of(context).colorScheme.inverseSurface,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -267,7 +267,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     return Dismissible(
       key: Key('link_${link.id}'),
       background: Container(
-        color: Colors.yellow,
+        color: Colors.yellow.shade700,
         child: const Align(
           alignment: Alignment.centerLeft,
           child: Padding(
@@ -277,7 +277,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         ),
       ),
       secondaryBackground: Container(
-        color: Colors.red,
+        color: Colors.red.shade700,
         child: const Align(
           alignment: Alignment.centerRight,
           child: Padding(
@@ -348,7 +348,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                   MaterialPageRoute(
                     builder: (context) => LinkDetailsPage(link: link),
                   ),
-                );
+                ).then((_) async => await loadLinks());
               }
             },
             onLongPress: () {
@@ -736,7 +736,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                         MaterialPageRoute(
                           builder: (context) => LinkDetailsPage(link: _filteredLinks[index]),
                         ),
-                      );
+                      ).then((_) async => await loadLinks());
                     }
                   },
                   onLongPress: () {

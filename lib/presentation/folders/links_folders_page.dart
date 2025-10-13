@@ -712,6 +712,7 @@ class LinksFoldersPageState extends State<LinksFoldersPage>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
           ),
         ],

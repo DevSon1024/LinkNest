@@ -82,7 +82,7 @@ class DatabaseHelper {
     final db = await database;
     final normalizedUrl = _normalizeUrl(link.url);
     print('DatabaseHelper: Inserting link ID: ${link.id}, URL: $normalizedUrl');
-    return await db.insert('links', link.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    return await db.insert('links', link.copyWith(url: normalizedUrl).toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<LinkModel>> getAllLinks() async {
@@ -109,11 +109,12 @@ class DatabaseHelper {
 
   Future<int> updateLink(LinkModel link) async {
     final db = await database;
-    final normalizedUrl = _normalizeUrl(link.url);
-    print('DatabaseHelper: Updating link ID: ${link.id}, URL: $normalizedUrl, Notes: "${link.notes}"');
+    print('DatabaseHelper: Updating link ID: ${link.id}, URL: ${link.url}, Notes: "${link.notes}"');
     try {
       final linkMap = link.toMap();
-      linkMap['url'] = normalizedUrl;
+
+      // Do not update the URL, as it's the UNIQUE key.
+      linkMap.remove('url');
 
       if (link.notes == null) {
         linkMap['notes'] = null;

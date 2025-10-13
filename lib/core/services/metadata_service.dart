@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class MetadataService {
   static final Map<String, LinkModel> _cache = {};
@@ -165,26 +166,20 @@ class MetadataService {
 
   static Future<String?> _compressImage(String imageUrl) async {
     try {
-      final response = await http.get(Uri.parse(imageUrl));
-      if (response.statusCode == 200) {
-        final originalFile = await _saveTemporaryFile(response.bodyBytes, 'original');
-        final targetPath = (await getTemporaryDirectory()).path + '/${DateTime.now().millisecondsSinceEpoch}_compressed.jpg';
+      final file = await DefaultCacheManager().getSingleFile(imageUrl);
+      final targetPath = (await getTemporaryDirectory()).path + '/${DateTime.now().millisecondsSinceEpoch}_compressed.jpg';
 
-        final result = await FlutterImageCompress.compressAndGetFile(
-          originalFile.absolute.path,
-          targetPath,
-          quality: 60, // Adjust quality as needed
-        );
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        targetPath,
+        quality: 60, // Adjust quality as needed
+      );
 
-        await originalFile.delete(); // Clean up original file
-
-        return result?.path;
-      }
+      return result?.path;
     } catch (e) {
       print('Image compression failed: $e');
       return null;
     }
-    return null;
   }
 
   static Future<File> _saveTemporaryFile(Uint8List bytes, String name) async {
@@ -204,6 +199,7 @@ class MetadataService {
     _cache.clear();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cacheKey);
+    await DefaultCacheManager().emptyCache();
   }
 
   static bool isValidUrl(String url) {
