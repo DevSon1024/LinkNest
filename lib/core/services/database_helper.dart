@@ -8,7 +8,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   static Database? _database;
-  static const int _databaseVersion = 5; // Incremented version
+  static const int _databaseVersion = 6; // Incremented for metadata loading field
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -36,34 +36,37 @@ class DatabaseHelper {
         imageUrl TEXT,
         createdAt INTEGER NOT NULL,
         domain TEXT NOT NULL,
-        tags TEXT,
+        tags TEXT DEFAULT "[]",
         notes TEXT,
         status TEXT NOT NULL DEFAULT "pending",
-        isFavorite INTEGER NOT NULL DEFAULT 0
+        isFavorite INTEGER NOT NULL DEFAULT 0,
+        isMetadataLoaded INTEGER NOT NULL DEFAULT 0
       )
     ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      await db
-          .execute('ALTER TABLE links ADD COLUMN tags TEXT NOT NULL DEFAULT "[]";');
+      await db.execute('ALTER TABLE links ADD COLUMN tags TEXT DEFAULT "[]";');
       await db.execute('ALTER TABLE links ADD COLUMN notes TEXT;');
     }
     if (oldVersion < 3) {
-      await db.execute(
-          'ALTER TABLE links ADD COLUMN status TEXT NOT NULL DEFAULT "pending";');
+      await db.execute('ALTER TABLE links ADD COLUMN status TEXT NOT NULL DEFAULT "pending";');
     }
     if (oldVersion < 4) {
-      // Re-check for tags column and add if it doesn't exist
       var tableInfo = await db.rawQuery('PRAGMA table_info(links)');
       var columnNames = tableInfo.map((row) => row['name']).toList();
       if (!columnNames.contains('tags')) {
-        await db.execute('ALTER TABLE links ADD COLUMN tags TEXT');
+        await db.execute('ALTER TABLE links ADD COLUMN tags TEXT DEFAULT "[]";');
       }
     }
     if (oldVersion < 5) {
       await db.execute('ALTER TABLE links ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0');
+    }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE links ADD COLUMN isMetadataLoaded INTEGER NOT NULL DEFAULT 0');
+      // Update existing tags that might be NULL to empty JSON array
+      await db.execute('UPDATE links SET tags = "[]" WHERE tags IS NULL OR tags = ""');
     }
   }
 
@@ -81,8 +84,17 @@ class DatabaseHelper {
   Future<int> insertLink(LinkModel link) async {
     final db = await database;
     final normalizedUrl = _normalizeUrl(link.url);
-    print('DatabaseHelper: Inserting link ID: ${link.id}, URL: $normalizedUrl');
-    return await db.insert('links', link.copyWith(url: normalizedUrl).toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    print('DatabaseHelper: Inserting link ID: ${link.id}, URL: $normalizedUrl, Tags: ${link.tags}');
+
+    final linkToInsert = link.copyWith(url: normalizedUrl);
+    final linkMap = linkToInsert.toMap();
+
+    // Ensure tags is properly serialized
+    if (linkMap['tags'] == null || linkMap['tags'] == '') {
+      linkMap['tags'] = '[]';
+    }
+
+    return await db.insert('links', linkMap, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<List<LinkModel>> getAllLinks() async {
@@ -109,12 +121,17 @@ class DatabaseHelper {
 
   Future<int> updateLink(LinkModel link) async {
     final db = await database;
-    print('DatabaseHelper: Updating link ID: ${link.id}, URL: ${link.url}, Notes: "${link.notes}"');
+    print('DatabaseHelper: Updating link ID: ${link.id}, URL: ${link.url}, Notes: "${link.notes}", Tags: ${link.tags}');
     try {
       final linkMap = link.toMap();
 
       // Do not update the URL, as it's the UNIQUE key.
       linkMap.remove('url');
+
+      // Ensure tags is properly serialized
+      if (linkMap['tags'] == null || linkMap['tags'] == '') {
+        linkMap['tags'] = '[]';
+      }
 
       if (link.notes == null) {
         linkMap['notes'] = null;
@@ -130,13 +147,14 @@ class DatabaseHelper {
       );
       print('DatabaseHelper: Updated link ID: ${link.id}, Rows affected: $result');
 
+      // Verification
       final verifyResult = await db.query(
         'links',
         where: 'id = ?',
         whereArgs: [link.id],
       );
       if (verifyResult.isNotEmpty) {
-        print('DatabaseHelper: Verification - Notes field after update: "${verifyResult.first['notes']}"');
+        print('DatabaseHelper: Verification - Notes: "${verifyResult.first['notes']}", Tags: "${verifyResult.first['tags']}"');
       }
 
       return result;
@@ -185,5 +203,10 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('links');
   }
 }

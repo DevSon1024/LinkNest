@@ -14,6 +14,7 @@ class LinkModel {
   final String? notes;
   final MetadataStatus status;
   final bool isFavorite;
+  final bool isMetadataLoaded;
 
   LinkModel({
     this.id,
@@ -23,10 +24,11 @@ class LinkModel {
     this.imageUrl,
     required this.createdAt,
     required this.domain,
-    this.tags = const [], // Modified
+    this.tags = const [],
     this.notes,
     this.status = MetadataStatus.pending,
     this.isFavorite = false,
+    this.isMetadataLoaded = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -42,10 +44,24 @@ class LinkModel {
       'notes': notes,
       'status': status.name,
       'isFavorite': isFavorite ? 1 : 0,
+      'isMetadataLoaded': isMetadataLoaded ? 1 : 0,
     };
   }
 
   factory LinkModel.fromMap(Map<String, dynamic> map) {
+    List<String> tagsList = [];
+    if (map['tags'] != null && map['tags'].toString().isNotEmpty) {
+      try {
+        final decoded = json.decode(map['tags']);
+        if (decoded is List) {
+          tagsList = decoded.cast<String>();
+        }
+      } catch (e) {
+        // If JSON decode fails, treat as empty list
+        tagsList = [];
+      }
+    }
+
     return LinkModel(
       id: map['id'],
       url: map['url'] ?? '',
@@ -54,15 +70,14 @@ class LinkModel {
       imageUrl: map['imageUrl'],
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       domain: map['domain'] ?? '',
-      tags: map['tags'] != null
-          ? List<String>.from(json.decode(map['tags']))
-          : <String>[], // Modified
+      tags: tagsList,
       notes: map['notes'],
       status: MetadataStatus.values.firstWhere(
             (e) => e.name == map['status'],
         orElse: () => MetadataStatus.pending,
       ),
       isFavorite: map['isFavorite'] == 1,
+      isMetadataLoaded: map['isMetadataLoaded'] == 1,
     );
   }
 
@@ -74,11 +89,12 @@ class LinkModel {
     String? imageUrl,
     DateTime? createdAt,
     String? domain,
-    List<String>? tags, // Modified
+    List<String>? tags,
     String? notes,
     bool clearNotes = false,
     MetadataStatus? status,
     bool? isFavorite,
+    bool? isMetadataLoaded,
   }) {
     return LinkModel(
       id: id ?? this.id,
@@ -88,10 +104,11 @@ class LinkModel {
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
       domain: domain ?? this.domain,
-      tags: tags ?? this.tags, // Modified
+      tags: tags ?? List<String>.from(this.tags), // Create new list to avoid reference issues
       notes: clearNotes ? null : (notes ?? this.notes),
       status: status ?? this.status,
       isFavorite: isFavorite ?? this.isFavorite,
+      isMetadataLoaded: isMetadataLoaded ?? this.isMetadataLoaded,
     );
   }
 }

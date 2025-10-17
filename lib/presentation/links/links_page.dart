@@ -8,6 +8,7 @@ import '../../core/services/database_helper.dart';
 import '../../core/services/metadata_service.dart';
 import '../widgets/link_card.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/enhanced_snackbar.dart';
 import 'widgets/link_options_menu.dart';
 import 'package:flutter/services.dart';
 import 'link_details_page.dart';
@@ -33,11 +34,21 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   bool _isLoading = false;
   bool _isSelectionMode = false;
   bool _isSearchVisible = false;
+  bool _isLoadingMetadata = false;
   late AnimationController _fabAnimationController;
   late AnimationController _searchAnimationController;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   SortOrder _sortOrder = SortOrder.latest;
+
+  // Lazy loading variables
+  int _currentPage = 0;
+  static const int _pageSize = 10;
+  bool _isLazyLoading = false;
+
+  // Refresh control variables
+  DateTime? _lastRefreshTime;
+  static const Duration _refreshCooldown = Duration(minutes: 5); // 5 minute cooldown
 
   @override
   void initState() {
@@ -55,6 +66,8 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     _searchController.addListener(() {
       _filterLinks();
     });
+    _scrollController.addListener(_onScroll);
+    _preloadMetadata();
   }
 
   @override
@@ -66,6 +79,71 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreLinks();
+    }
+  }
+
+  Future<void> _loadMoreLinks() async {
+    if (_isLazyLoading) return;
+
+    setState(() => _isLazyLoading = true);
+
+    // Simulate loading more metadata in background
+    final startIndex = _currentPage * _pageSize;
+    final endIndex = startIndex + _pageSize;
+
+    if (startIndex < _links.length) {
+      final batch = _links.skip(startIndex).take(_pageSize).toList();
+      await _loadMetadataForBatch(batch);
+      _currentPage++;
+    }
+
+    setState(() => _isLazyLoading = false);
+  }
+
+  Future<void> _loadMetadataForBatch(List<LinkModel> batch) async {
+    for (final link in batch) {
+      if (link.status == MetadataStatus.pending && !link.isMetadataLoaded) {
+        try {
+          final metadata = await MetadataService.extractMetadata(link.url);
+          if (metadata != null && mounted) {
+            final updatedLink = link.copyWith(
+              title: metadata.title,
+              description: metadata.description,
+              imageUrl: metadata.imageUrl,
+              domain: metadata.domain,
+              status: MetadataStatus.completed,
+              isMetadataLoaded: true,
+            );
+            await _dbHelper.updateLink(updatedLink);
+
+            // Update in current lists
+            final index = _links.indexWhere((l) => l.id == link.id);
+            if (index != -1) {
+              setState(() {
+                _links[index] = updatedLink;
+              });
+            }
+            _filterLinks();
+          }
+        } catch (e) {
+          print('Error loading metadata for ${link.url}: $e');
+        }
+      }
+
+      // Small delay to prevent overwhelming the system
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> _preloadMetadata() async {
+    // Load metadata for first batch in background
+    await Future.delayed(const Duration(milliseconds: 500));
+    _loadMoreLinks();
+  }
 
   Future<void> _loadViewPreference() async {
     final prefs = await SharedPreferences.getInstance();
@@ -88,10 +166,11 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       setState(() {
         _links = links;
         _filteredLinks = links;
+        _currentPage = 0;
         _sortLinks();
       });
     } catch (e) {
-      _showSnackBar('Error loading links: $e');
+      _showEnhancedSnackBar('Error loading links: $e', type: SnackBarType.error);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -106,7 +185,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         _filteredLinks = _links.where((link) {
           final titleMatch = link.title?.toLowerCase().contains(query) ?? false;
           final urlMatch = link.url.toLowerCase().contains(query);
-          final domainMatch = link.domain?.toLowerCase().contains(query) ?? false;
+          final domainMatch = link.domain.toLowerCase().contains(query);
           final tagMatch = link.tags.any((tag) => tag.toLowerCase().contains(query));
           return titleMatch || urlMatch || domainMatch || tagMatch;
         }).toList();
@@ -191,7 +270,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         subject: 'Shared ${_selectedLinks.length} Links',
       );
     } catch (e) {
-      _showSnackBar('Error sharing links: $e');
+      _showEnhancedSnackBar('Error sharing links: $e', type: SnackBarType.error);
     }
   }
 
@@ -245,22 +324,164 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       _selectedLinks.clear();
       _toggleSelectionMode();
       await loadLinks();
-      _showSnackBar('Links deleted successfully');
+      _showEnhancedSnackBar('Links deleted successfully', type: SnackBarType.success);
     }
   }
 
-  void _showSnackBar(String message, {bool persistent = false}) {
+  void _showEnhancedSnackBar(String message, {SnackBarType type = SnackBarType.info, bool persistent = false}) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: TextStyle(color: Theme.of(context).colorScheme.onInverseSurface)),
-        backgroundColor: Theme.of(context).colorScheme.inverseSurface,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration:
-        persistent ? const Duration(days: 1) : const Duration(seconds: 4),
+      EnhancedSnackBar.create(
+        context: context,
+        message: message,
+        type: type,
+        persistent: persistent,
       ),
     );
+  }
+
+  // UPDATED: Smart refresh logic with cooldown and completion check
+  Future<void> _refreshMetadata() async {
+    // Check if we're already refreshing
+    if (_isLoadingMetadata) {
+      _showEnhancedSnackBar('Refresh already in progress...', type: SnackBarType.info);
+      return;
+    }
+
+    // Check if we recently refreshed (within cooldown period)
+    final now = DateTime.now();
+    if (_lastRefreshTime != null &&
+        now.difference(_lastRefreshTime!) < _refreshCooldown) {
+      final remainingTime = _refreshCooldown - now.difference(_lastRefreshTime!);
+      final remainingMinutes = remainingTime.inMinutes;
+      final remainingSeconds = remainingTime.inSeconds % 60;
+
+      _showEnhancedSnackBar(
+          'Please wait ${remainingMinutes}m ${remainingSeconds}s before refreshing again',
+          type: SnackBarType.info
+      );
+      return;
+    }
+
+    // Check if all links already have complete metadata
+    final pendingLinks = _links.where((link) =>
+    link.status == MetadataStatus.pending ||
+        link.status == MetadataStatus.failed ||
+        !link.isMetadataLoaded
+    ).toList();
+
+    if (pendingLinks.isEmpty && _links.isNotEmpty) {
+      _showEnhancedSnackBar(
+          'Database already refreshed! All metadata is up to date.',
+          type: SnackBarType.success
+      );
+      return;
+    }
+
+    // Proceed with refresh
+    setState(() => _isLoadingMetadata = true);
+
+    try {
+      await MetadataService.clearCache();
+
+      // Only process links that need metadata updates
+      final linksToUpdate = pendingLinks.isNotEmpty ? pendingLinks : _links;
+      final totalLinks = linksToUpdate.length;
+
+      if (totalLinks == 0) {
+        _showEnhancedSnackBar('No links to refresh', type: SnackBarType.info);
+        return;
+      }
+
+      _showEnhancedSnackBar(
+          'Refreshing metadata for ${totalLinks} link(s)...',
+          type: SnackBarType.info,
+          persistent: true
+      );
+
+      // Process in smaller batches to show progress
+      const batchSize = 3; // Reduced batch size for better progress tracking
+      int processedCount = 0;
+      int successCount = 0;
+
+      for (int i = 0; i < linksToUpdate.length; i += batchSize) {
+        final batch = linksToUpdate.skip(i).take(batchSize).toList();
+
+        for (var link in batch) {
+          try {
+            final updatedMetadata = await MetadataService.extractMetadata(link.url);
+            if (updatedMetadata != null) {
+              final updatedLink = link.copyWith(
+                title: updatedMetadata.title,
+                description: updatedMetadata.description,
+                imageUrl: updatedMetadata.imageUrl,
+                domain: updatedMetadata.domain,
+                status: MetadataStatus.completed,
+                isMetadataLoaded: true,
+              );
+              await _dbHelper.updateLink(updatedLink);
+              successCount++;
+            } else {
+              // Mark as failed if no metadata could be extracted
+              final failedLink = link.copyWith(
+                status: MetadataStatus.failed,
+                isMetadataLoaded: true,
+              );
+              await _dbHelper.updateLink(failedLink);
+            }
+          } catch (e) {
+            print('Error updating metadata for ${link.url}: $e');
+            // Mark as failed on error
+            final failedLink = link.copyWith(
+              status: MetadataStatus.failed,
+              isMetadataLoaded: true,
+            );
+            await _dbHelper.updateLink(failedLink);
+          }
+
+          processedCount++;
+
+          // Update progress (ensure we don't exceed 100%)
+          final progress = ((processedCount / totalLinks) * 100).clamp(0, 100).round();
+          if (mounted && progress < 100) {
+            _showEnhancedSnackBar(
+                'Refreshing metadata... ${progress}%',
+                type: SnackBarType.info,
+                persistent: true
+            );
+          }
+        }
+
+        // Small delay between batches to prevent overwhelming the system
+        if (i + batchSize < linksToUpdate.length) {
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      }
+
+      // Update the last refresh time
+      _lastRefreshTime = DateTime.now();
+
+      // Reload the links to reflect changes
+      await loadLinks();
+
+      // Show completion message
+      final String completionMessage;
+      if (successCount == totalLinks) {
+        completionMessage = 'Metadata refresh complete! Updated $successCount link(s).';
+      } else {
+        final failedCount = totalLinks - successCount;
+        completionMessage = 'Metadata refresh complete! Updated $successCount, failed $failedCount link(s).';
+      }
+
+      _showEnhancedSnackBar(completionMessage, type: SnackBarType.success);
+
+    } catch (e) {
+      _showEnhancedSnackBar('Error refreshing metadata: $e', type: SnackBarType.error);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingMetadata = false);
+      }
+    }
   }
 
   Widget _buildLinkIcon(LinkModel link) {
@@ -278,7 +499,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
 
   Widget _buildModernLinkTile(LinkModel link, int index) {
     final isSelected = _selectedLinks.contains(link);
-    final domain = link.domain ?? Uri.parse(link.url).host;
+    final domain = link.domain.isNotEmpty ? link.domain : Uri.parse(link.url).host;
 
     return Dismissible(
       key: Key('link_${link.id}'),
@@ -307,8 +528,9 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           if (link.id != null) {
             await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
             await loadLinks();
-            _showSnackBar(
-                link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
+            _showEnhancedSnackBar(
+                link.isFavorite ? 'Removed from favorites' : 'Added to favorites',
+                type: link.isFavorite ? SnackBarType.info : SnackBarType.success);
           }
           return false;
         } else {
@@ -316,26 +538,16 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               context: context,
               builder: (BuildContext context) {
                 return AlertDialog(
-                  content: Text(
-                      "Are you sure you want to delete ${link.title}?"),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  content: Text("Are you sure you want to delete ${link.title ?? 'this link'}?"),
                   actions: <Widget>[
                     TextButton(
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(color: Colors.black),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop(false);
-                      },
+                      child: const Text("Cancel", style: TextStyle(color: Colors.black)),
+                      onPressed: () => Navigator.of(context).pop(false),
                     ),
                     TextButton(
-                      child: const Text(
-                        "Delete",
-                        style: TextStyle(color: Colors.red),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop(true);
-                      },
+                      child: const Text("Delete", style: TextStyle(color: Colors.red)),
+                      onPressed: () => Navigator.of(context).pop(true),
                     ),
                   ],
                 );
@@ -344,7 +556,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             if (link.id != null) {
               await _dbHelper.deleteLink(link.id!);
               await loadLinks();
-              _showSnackBar('Link deleted');
+              _showEnhancedSnackBar('Link deleted', type: SnackBarType.success);
             }
           }
           return res;
@@ -412,6 +624,27 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                             color: Theme.of(context).colorScheme.outline,
                           ),
                         ),
+                        if (link.tags.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 4.0,
+                            runSpacing: 2.0,
+                            children: link.tags.take(3).map((tag) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                tag,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            )).toList(),
+                          ),
+                        ],
                         const SizedBox(height: 2),
                         Text(
                           '${link.createdAt.day} ${_getMonthName(link.createdAt.month)}',
@@ -424,11 +657,19 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                   ),
 
                   if (!_isSelectionMode)
-                    IconButton(
-                      onPressed: () => _showLinkOptionsMenu(context, link),
-                      icon: const Icon(CupertinoIcons.ellipsis, size: 18),
-                      style: IconButton.styleFrom(
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: IconButton(
+                        onPressed: () => _showLinkOptionsMenu(context, link),
+                        icon: const Icon(CupertinoIcons.ellipsis, size: 18),
+                        style: IconButton.styleFrom(
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
                     ),
                 ],
@@ -505,7 +746,6 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     }
 
     if (olderLinks.isNotEmpty) {
-      // Group older links by date
       final dateGroups = <String, List<LinkModel>>{};
       for (final link in olderLinks) {
         final dateKey = '${link.createdAt.year}/${link.createdAt.month.toString().padLeft(2, '0')}/${link.createdAt.day.toString().padLeft(2, '0')}';
@@ -522,6 +762,9 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         }
       }
     }
+
+    // Add bottom padding for navigation bar
+    widgets.add(const SizedBox(height: 120));
 
     return widgets;
   }
@@ -557,6 +800,14 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           IconButton(
             onPressed: _toggleSearch,
             icon: Icon(_isSearchVisible ? CupertinoIcons.xmark : CupertinoIcons.search),
+            style: IconButton.styleFrom(
+              backgroundColor: _isSearchVisible
+                  ? Theme.of(context).colorScheme.errorContainer.withOpacity(0.3)
+                  : Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+              padding: const EdgeInsets.all(12),
+              minimumSize: const Size(44, 44),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
           if (!_isSearchVisible) ...[
             IconButton(
@@ -569,42 +820,42 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
               icon: Icon(_viewMode == ViewMode.list
                   ? CupertinoIcons.square_grid_2x2
                   : CupertinoIcons.list_bullet),
+              style: IconButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                padding: const EdgeInsets.all(12),
+                minimumSize: const Size(44, 44),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
             PopupMenuButton(
-              icon: const Icon(CupertinoIcons.ellipsis),
+              icon: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(CupertinoIcons.ellipsis, size: 20),
+              ),
               itemBuilder: (context) => [
                 PopupMenuItem(
-                  child: const Row(
+                  enabled: !_isLoadingMetadata, // Disable when already refreshing
+                  child: Row(
                     children: [
-                      Icon(CupertinoIcons.arrow_clockwise, size: 18),
-                      SizedBox(width: 8),
-                      Text('Refresh metadata'),
+                      Icon(
+                        _isLoadingMetadata ? CupertinoIcons.refresh : CupertinoIcons.arrow_clockwise,
+                        size: 18,
+                        color: _isLoadingMetadata ? Theme.of(context).colorScheme.outline : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isLoadingMetadata ? 'Refreshing...' : 'Refresh metadata',
+                        style: TextStyle(
+                          color: _isLoadingMetadata ? Theme.of(context).colorScheme.outline : null,
+                        ),
+                      ),
                     ],
                   ),
-                  onTap: () async {
-                    _showSnackBar('Fetching metadata...', persistent: true);
-                    try {
-                      await MetadataService.clearCache();
-                      for (var link in _links) {
-                        final updatedMetadata =
-                        await MetadataService.extractMetadata(link.url);
-                        if (updatedMetadata != null) {
-                          final updatedLink = link.copyWith(
-                            title: updatedMetadata.title,
-                            description: updatedMetadata.description,
-                            imageUrl: updatedMetadata.imageUrl,
-                            domain: updatedMetadata.domain,
-                            status: MetadataStatus.completed,
-                          );
-                          await _dbHelper.updateLink(updatedLink);
-                        }
-                      }
-                      await loadLinks();
-                      _showSnackBar('Metadata fetching complete!');
-                    } catch (e) {
-                      _showSnackBar('Error refreshing: $e');
-                    }
-                  },
+                  onTap: _isLoadingMetadata ? null : _refreshMetadata,
                 ),
                 PopupMenuItem(
                   child: Row(
@@ -628,160 +879,193 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           ],
         ],
       ),
-      body: Column(
-        children: [
-          // Items count
-          if (!_isSearchVisible)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    '${_filteredLinks.length} items in total',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
+      body: RefreshIndicator(
+        onRefresh: _refreshMetadata, // This handles the pull-to-refresh
+        child: Column(
+          children: [
+            // Items count with refresh indicator
+            if (!_isSearchVisible)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '${_filteredLinks.length} items in total',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                     ),
-                  ),
-                ],
+                    if (_isLoadingMetadata) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                    if (_lastRefreshTime != null) ...[
+                      const Spacer(),
+                      Text(
+                        'Last refreshed: ${_lastRefreshTime!.hour.toString().padLeft(2, '0')}:${_lastRefreshTime!.minute.toString().padLeft(2, '0')}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
 
-          // Search results info
-          if (_isSearchVisible && _searchController.text.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    'Found ${_filteredLinks.length} results for "${_searchController.text}"',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
+            // Rest of the existing UI code remains the same...
+            // Search results info
+            if (_isSearchVisible && _searchController.text.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      'Found ${_filteredLinks.length} results for "${_searchController.text}"',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-          // Selection mode header
-          if (_isSelectionMode)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              color: Theme.of(context).colorScheme.surfaceVariant,
-              child: Row(
-                children: [
-                  Checkbox(
-                    value: _selectedLinks.length == _filteredLinks.length,
-                    onChanged: (value) => _selectAllLinks(),
-                    shape: const CircleBorder(),
-                  ),
-                  Text(
-                    '${_selectedLinks.length} selected',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.xmark),
-                    onPressed: _toggleSelectionMode,
-                  )
-                ],
+            // Selection mode header
+            if (_isSelectionMode)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _selectedLinks.length == _filteredLinks.length,
+                      onChanged: (value) => _selectAllLinks(),
+                      shape: const CircleBorder(),
+                    ),
+                    Text(
+                      '${_selectedLinks.length} selected',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.xmark),
+                      onPressed: _toggleSelectionMode,
+                    )
+                  ],
+                ),
               ),
-            ),
 
-          // Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredLinks.isEmpty
-                ? _searchController.text.isNotEmpty
-                ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    CupertinoIcons.search,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No links found',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            // Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredLinks.isEmpty
+                  ? _searchController.text.isNotEmpty
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      CupertinoIcons.search,
+                      size: 64,
                       color: Theme.of(context).colorScheme.outline,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Try adjusting your search terms',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
+                    const SizedBox(height: 16),
+                    Text(
+                      'No links found',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            )
-                : const EmptyState()
-                : RefreshIndicator(
-              onRefresh: loadLinks,
-              child: _viewMode == ViewMode.list
+                    const SizedBox(height: 8),
+                    Text(
+                      'Try adjusting your search terms',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : const EmptyState()
+                  : _viewMode == ViewMode.list
                   ? ListView(
                 controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 200),
                 children: _buildGroupedLinks(),
               )
                   : GridView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120), // Added bottom margin
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   childAspectRatio: 0.75,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
-                itemCount: _filteredLinks.length,
-                itemBuilder: (context, index) => LinkCard(
-                  link: _filteredLinks[index],
-                  isGridView: true,
-                  isSelectionMode: _isSelectionMode,
-                  isSelected: _selectedLinks.contains(_filteredLinks[index]),
-                  onTap: () {
-                    if (_isSelectionMode) {
+                itemCount: _filteredLinks.length + (_isLazyLoading ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == _filteredLinks.length) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  return LinkCard(
+                    link: _filteredLinks[index],
+                    isGridView: true,
+                    isSelectionMode: _isSelectionMode,
+                    isSelected: _selectedLinks.contains(_filteredLinks[index]),
+                    onTap: () {
+                      if (_isSelectionMode) {
+                        _toggleLinkSelection(_filteredLinks[index]);
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LinkDetailsPage(link: _filteredLinks[index]),
+                          ),
+                        ).then((_) async => await loadLinks());
+                      }
+                    },
+                    onLongPress: () {
+                      if (!_isSelectionMode) {
+                        _toggleSelectionMode();
+                      }
                       _toggleLinkSelection(_filteredLinks[index]);
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LinkDetailsPage(link: _filteredLinks[index]),
-                        ),
-                      ).then((_) async => await loadLinks());
-                    }
-                  },
-                  onLongPress: () {
-                    if (!_isSelectionMode) {
-                      _toggleSelectionMode();
-                    }
-                    _toggleLinkSelection(_filteredLinks[index]);
-                  },
-                  onOptionsTap: () => _showLinkOptionsMenu(context, _filteredLinks[index]),
-                  onDelete: (link) async {
-                    if (link.id != null) {
-                      await _dbHelper.deleteLink(link.id!);
-                      await loadLinks();
-                      _showSnackBar('Link deleted');
-                    }
-                  },
-                  onFavoriteToggle: (link) async {
-                    if (link.id != null) {
-                      await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
-                      await loadLinks();
-                      _showSnackBar(
-                          link.isFavorite ? 'Removed from favorites' : 'Added to favorites');
-                    }
-                  },
-                ),
+                    },
+                    onOptionsTap: () => _showLinkOptionsMenu(context, _filteredLinks[index]),
+                    onDelete: (link) async {
+                      if (link.id != null) {
+                        await _dbHelper.deleteLink(link.id!);
+                        await loadLinks();
+                        _showEnhancedSnackBar('Link deleted', type: SnackBarType.success);
+                      }
+                    },
+                    onFavoriteToggle: (link) async {
+                      if (link.id != null) {
+                        await _dbHelper.toggleFavoriteStatus(link.id!, !link.isFavorite);
+                        await loadLinks();
+                        _showEnhancedSnackBar(
+                            link.isFavorite ? 'Removed from favorites' : 'Added to favorites',
+                            type: link.isFavorite ? SnackBarType.info : SnackBarType.success);
+                      }
+                    },
+                  );
+                },
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: _isSelectionMode && _selectedLinks.isNotEmpty
           ? Padding(
@@ -809,6 +1093,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
     );
   }
 
+  // Rest of the methods remain the same...
   Future<void> _openLink(String url, {bool useDefaultBrowser = false}) async {
     try {
       String formattedUrl = url.trim();
@@ -819,7 +1104,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
 
       final uri = Uri.tryParse(formattedUrl);
       if (uri == null || !uri.hasScheme) {
-        _showSnackBar('Invalid URL: $formattedUrl');
+        _showEnhancedSnackBar('Invalid URL: $formattedUrl', type: SnackBarType.error);
         return;
       }
 
@@ -827,7 +1112,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          _showSnackBar('Cannot open link in default browser');
+          _showEnhancedSnackBar('Cannot open link in default browser', type: SnackBarType.error);
         }
       } else {
         if (await canLaunchUrl(uri)) {
@@ -836,12 +1121,12 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           } else {
-            _showSnackBar('Cannot open link');
+            _showEnhancedSnackBar('Cannot open link', type: SnackBarType.error);
           }
         }
       }
     } catch (e) {
-      _showSnackBar('Error opening URL: $e');
+      _showEnhancedSnackBar('Error opening URL: $e', type: SnackBarType.error);
     }
   }
 
@@ -863,7 +1148,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
         onOpenInBrowser: () => _openLink(link.url, useDefaultBrowser: true),
         onCopyUrl: () {
           Clipboard.setData(ClipboardData(text: link.url));
-          _showSnackBar('URL copied to clipboard');
+          _showEnhancedSnackBar('URL copied to clipboard', type: SnackBarType.success);
         },
         onShare: () async {
           try {
@@ -874,18 +1159,16 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                   : 'Shared Link',
             );
           } catch (e) {
-            _showSnackBar('Error sharing link: $e');
+            _showEnhancedSnackBar('Error sharing link: $e', type: SnackBarType.error);
           }
         },
         onDelete: () async {
           final confirm = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               title: const Text('Delete Link'),
-              content:
-              const Text('Are you sure you want to delete this link?'),
+              content: const Text('Are you sure you want to delete this link?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
@@ -895,11 +1178,9 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                   onPressed: () => Navigator.pop(context, true),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text('Delete',
-                      style: TextStyle(color: Colors.white)),
+                  child: const Text('Delete', style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),
@@ -914,8 +1195,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
                 content: const Text('Link deleted'),
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 action: SnackBarAction(
                   label: 'Undo',
                   textColor: Colors.blue,
