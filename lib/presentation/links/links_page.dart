@@ -89,7 +89,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
   Future<void> _loadMoreLinks() async {
     if (_isLazyLoading) return;
 
-    setState(() => _isLazyLoading = true);
+    if (mounted) setState(() => _isLazyLoading = true);
 
     // Simulate loading more metadata in background
     final startIndex = _currentPage * _pageSize;
@@ -101,7 +101,7 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
       _currentPage++;
     }
 
-    setState(() => _isLazyLoading = false);
+    if (mounted) setState(() => _isLazyLoading = false);
   }
 
   Future<void> _loadMetadataForBatch(List<LinkModel> batch) async {
@@ -123,9 +123,11 @@ class LinksPageState extends State<LinksPage> with TickerProviderStateMixin {
             // Update in current lists
             final index = _links.indexWhere((l) => l.id == link.id);
             if (index != -1) {
-              setState(() {
-                _links[index] = updatedLink;
-              });
+              if (mounted) {
+                setState(() {
+                  _links[index] = updatedLink;
+                });
+              }
             }
             _filterLinks();
           }
